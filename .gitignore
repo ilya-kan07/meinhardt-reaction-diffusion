@@ -1,6 +1,7 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 *.pyo
 *.pyd
 .Python
@@ -18,20 +19,10 @@ coverage.xml
 *.cover
 *.log
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
 # Virtual environments
 venv/
 env/
 .venv/
-
-# Results
-results/
-*.png
-*.txt
 
 # IDE
 .idea/
@@ -46,3 +37,14 @@ Thumbs.db
 build/
 dist/
 *.spec
+
+# === ТОЛЬКО РЕЗУЛЬТАТЫ РАСЧЁТОВ ===
+results/
+*.csv
+*.dat
+*.npy
+
+# === НО: НЕ ИГНОРИРУЙ РЕСУРСЫ И ДОКУМЕНТАЦИЮ ===
+# УДАЛИ ЭТИ СТРОКИ:
+# *.png
+# *.txt
