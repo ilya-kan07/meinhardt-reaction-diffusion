@@ -12,6 +12,7 @@ import os
 import re
 import sys
 from tkinter import simpledialog
+from src.utils.paths import get_resource_path, get_results_dir
 
 
 class ParameterApp:
@@ -65,8 +66,8 @@ class ParameterApp:
         scrollbar.pack(side="right", fill="y")
 
     def add_conditions_image(self):
-        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        image_path = os.path.join(BASE_DIR, "resources", "conditions.png")
+        image_path = get_resource_path("conditions.png")
+
         if not os.path.exists(image_path):
             messagebox.showerror("Ошибка", f"Файл не найден: {image_path}")
             return
@@ -190,7 +191,7 @@ class ParameterApp:
         ax3.set_title('Начальное условие: y(x)')
 
         fig.tight_layout()
-        fig.savefig(os.path.join(save_dir, "initial_conditions.png"),
+        fig.savefig(save_dir / "initial_conditions.png",
                     dpi=300, bbox_inches='tight')
         plt.close(fig)
 
@@ -682,8 +683,7 @@ class NumericalSolutionApp:
         self.progress_queue = queue.Queue()
 
     def add_conditions_image(self):
-        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        image_path = os.path.join(BASE_DIR, "resources", "main_conditions.png")
+        image_path = get_resource_path("main_conditions.png")
         if not os.path.exists(image_path):
             messagebox.showerror("Ошибка", f"Файл не найден: {image_path}")
             return
@@ -1589,13 +1589,6 @@ class NumericalSolutionApp:
                             f"{base_layer['y'][i]:.6f}", f"{y_control[i]:.6f}", f"{y_diff[i]:.6f}"))
 
 
-def get_base_path():
-    if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)
-    else:
-        return os.path.dirname(os.path.abspath(__file__))
-
-
 class MainApp:
     def __init__(self, root):
         self.root = root
@@ -1635,14 +1628,10 @@ class MainApp:
                 "Предупреждение", "Имя папки не указано. Сохранение отменено.")
             return
 
-        results_dir = os.path.join(get_base_path(), "results")
-        os.makedirs(results_dir, exist_ok=True)
-
-        save_dir = os.path.join(results_dir, folder_name)
-        os.makedirs(save_dir, exist_ok=True)
+        save_dir = get_results_dir() / folder_name
+        save_dir.mkdir(parents=True, exist_ok=True)
 
         self.parameter_app.save_initial_conditions_plot(save_dir)
-
         self.numerical_app.save_solution_plots(save_dir)
 
         # Сохранение параметров в текстовый файл
