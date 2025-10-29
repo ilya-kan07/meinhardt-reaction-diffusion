@@ -14,6 +14,7 @@ import sys
 from tkinter import simpledialog
 from src.utils.paths import get_resource_path, get_results_dir
 from src.config.presets import PRESETS
+from src.core.initial_conditions import compute_initial_conditions
 
 
 class ParameterApp:
@@ -409,59 +410,27 @@ class ParameterApp:
 
             self.update_time_constraint()
 
-    def compute_initial_conditions(self):
-        """
-        Вычисляет начальные условия a(x), s(x), y(x) по формуле:
-            u(x) = a0 + a1*cos(b1*π*x) + a2*cos(b2*π*x) + a3*cos(b3*π*x)
-
-        Returns:
-            bool: True если параметры валидны, иначе False.
-        """
+    def compute_initial_conditions(self) -> bool:
         if not self.validate_parameters():
             return False
 
         try:
-            a_0 = np.array([float(self.entries["a_0"][0].get()),
-                            float(self.entries["a_0"][1].get()),
-                            float(self.entries["a_0"][2].get())])
-            a_1 = np.array([float(self.entries["a_1"][0].get()),
-                            float(self.entries["a_1"][1].get()),
-                            float(self.entries["a_1"][2].get())])
-            a_2 = np.array([float(self.entries["a_2"][0].get()),
-                            float(self.entries["a_2"][1].get()),
-                            float(self.entries["a_2"][2].get())])
-            a_3 = np.array([float(self.entries["a_3"][0].get()),
-                            float(self.entries["a_3"][1].get()),
-                            float(self.entries["a_3"][2].get())])
-            b_1 = int(self.entries["b_1"].get())
-            b_2 = int(self.entries["b_2"].get())
-            b_3 = int(self.entries["b_3"].get())
+            a0 = np.array([float(e.get()) for e in self.entries["a_0"]])
+            a1 = np.array([float(e.get()) for e in self.entries["a_1"]])
+            a2 = np.array([float(e.get()) for e in self.entries["a_2"]])
+            a3 = np.array([float(e.get()) for e in self.entries["a_3"]])
+            b1 = int(self.entries["b_1"].get())
+            b2 = int(self.entries["b_2"].get())
+            b3 = int(self.entries["b_3"].get())
             n = int(self.entries["n (сетка по x)"].get()) + 1
 
-            x_coarse = np.array([i * 1.0 / (n-1) for i in range(n)])
-            a_x_coarse = a_0[0] + a_1[0]*np.cos(b_1*np.pi*x_coarse) + a_2[0]*np.cos(
-                b_2*np.pi*x_coarse) + a_3[0]*np.cos(b_3*np.pi*x_coarse)
-            s_x_coarse = a_0[1] + a_1[1]*np.cos(b_1*np.pi*x_coarse) + a_2[1]*np.cos(
-                b_2*np.pi*x_coarse) + a_3[1]*np.cos(b_3*np.pi*x_coarse)
-            y_x_coarse = a_0[2] + a_1[2]*np.cos(b_1*np.pi*x_coarse) + a_2[2]*np.cos(
-                b_2*np.pi*x_coarse) + a_3[2]*np.cos(b_3*np.pi*x_coarse)
-
-            x_fine = np.linspace(0, 1, 1000)
-            a_x_fine = a_0[0] + a_1[0]*np.cos(b_1*np.pi*x_fine) + a_2[0]*np.cos(
-                b_2*np.pi*x_fine) + a_3[0]*np.cos(b_3*np.pi*x_fine)
-            s_x_fine = a_0[1] + a_1[1]*np.cos(b_1*np.pi*x_fine) + a_2[1]*np.cos(
-                b_2*np.pi*x_fine) + a_3[1]*np.cos(b_3*np.pi*x_fine)
-            y_x_fine = a_0[2] + a_1[2]*np.cos(b_1*np.pi*x_fine) + a_2[2]*np.cos(
-                b_2*np.pi*x_fine) + a_3[2]*np.cos(b_3*np.pi*x_fine)
-
-            self.initial_conditions = {
-                'coarse': {'x': x_coarse, 'a': a_x_coarse, 's': s_x_coarse, 'y': y_x_coarse},
-                'fine': {'x': x_fine, 'a': a_x_fine, 's': s_x_fine, 'y': y_x_fine}
-            }
+            self.initial_conditions = compute_initial_conditions(
+                a0, a1, a2, a3, b1, b2, b3, n
+            )
             return True
+
         except ValueError as e:
-            messagebox.showerror(
-                "Ошибка", "Проверьте введенные параметры: все значения должны быть числами!")
+            messagebox.showerror("Ошибка", f"Некорректные данные: {e}")
             return False
 
     def get_axis_limits(self):
