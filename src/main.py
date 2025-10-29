@@ -13,6 +13,7 @@ import re
 import sys
 from tkinter import simpledialog
 from src.utils.paths import get_resource_path, get_results_dir
+from src.config.presets import PRESETS
 
 
 class ParameterApp:
@@ -340,36 +341,43 @@ class ParameterApp:
         self.update_time_constraint()
 
     def apply_preset(self):
-        preset = self.preset_var.get()
+        preset_name = self.preset_var.get()
+        if preset_name not in PRESETS:
+            return
+
+        preset_data = PRESETS[preset_name]
+
         try:
-            if preset == "Набор 1 (стационарное однородное)":
-                preset_data = {
-                    "a_0": np.array([1.0, 0.5, 0.2]),
-                    "a_1": np.array([0, 0, 0]),
-                    "a_2": np.array([0, 0, 0]),
-                    "a_3": np.array([0.01, 0.05, 0.02]),
-                    "b_1": 0, "b_2": 0, "b_3": 3,
-                    "n": 10, "m": 500, "T": 10.0,
-                    "system_params": {
-                        "c": 16.67, "μ": 1.2, "c₀": 1.128, "ν": 0.33,
-                        "ε": 3.3, "d": 0.023, "e": 1.67, "f": 9.0,
-                        "η": 16.67, "Dₐ": 0.1, "Dₛ": 0.1, "Dᵧ": 0.1
-                    }
-                }
-            elif preset == "Набор 2 (стационарное неоднородное)":
-                preset_data = {
-                    "a_0": np.array([1.0, 0.5, 0.2]),
-                    "a_1": np.array([0.1, 0.5, 1]),
-                    "a_2": np.array([0, 0, 0]),
-                    "a_3": np.array([0, 0, 0]),
-                    "b_1": 1, "b_2": 0, "b_3": 0,
-                    "n": 10, "m": 150000, "T": 600.0,
-                    "system_params": {
-                        "c": 16.67, "μ": 1.2, "c₀": 1.128, "ν": 0.33,
-                        "ε": 3.3, "d": 0.023, "e": 1.67, "f": 9.0,
-                        "η": 16.67, "Dₐ": 0.05, "Dₛ": 1.0, "Dᵧ": 1.0
-                    }
-                }
+            # Заполнение a_0
+            for i, val in enumerate(preset_data["a_0"]):
+                self.entries["a_0"][i].delete(0, tk.END)
+                self.entries["a_0"][i].insert(0, str(val))
+
+            # Заполнение a_1, a_2, a_3 и b_1, b_2, b_3
+            for i in range(1, 4):
+                a_i = preset_data[f"a_{i}"]
+                b_i = preset_data[f"b_{i}"]
+                for j, val in enumerate(a_i):
+                    self.entries[f"a_{i}"][j].delete(0, tk.END)
+                    self.entries[f"a_{i}"][j].insert(0, str(val))
+                self.entries[f"b_{i}"].delete(0, tk.END)
+                self.entries[f"b_{i}"].insert(0, str(b_i))
+
+            # n, m, T
+            self.entries["n (сетка по x)"].delete(0, tk.END)
+            self.entries["m (сетка по t)"].delete(0, tk.END)
+            self.entries["T (время)"].delete(0, tk.END)
+            self.entries["n (сетка по x)"].insert(0, str(preset_data["n"]))
+            self.entries["m (сетка по t)"].insert(0, str(preset_data["m"]))
+            self.entries["T (время)"].insert(0, str(preset_data["T"]))
+
+            # Системные параметры
+            self.numerical_app_callback(preset_data["system_params"])
+
+            self.update_time_constraint()
+
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось загрузить параметры: {e}")
 
             self.entries["a_0"][0].delete(0, tk.END)
             self.entries["a_0"][1].delete(0, tk.END)
@@ -400,10 +408,6 @@ class ParameterApp:
             self.numerical_app_callback(preset_data["system_params"])
 
             self.update_time_constraint()
-
-        except Exception as e:
-            messagebox.showerror(
-                "Ошибка", f"Не удалось загрузить параметры: {e}")
 
     def compute_initial_conditions(self):
         """
