@@ -1,1 +1,0 @@
-для запуска main.py: python -m src.main

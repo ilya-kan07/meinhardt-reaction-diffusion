@@ -15,6 +15,7 @@ from tkinter import simpledialog
 from src.utils.paths import get_resource_path, get_results_dir
 from src.config.presets import PRESETS
 from src.core.initial_conditions import compute_initial_conditions
+from src.core.solver import MeinhardtSolver
 
 
 class ParameterApp:
@@ -983,334 +984,93 @@ class NumericalSolutionApp:
             return False
 
     def compute_solution(self, continue_from_step=0):
-        try:
-            if not self.parameter_app.initial_conditions:
-                def update_ui_on_error():
-                    self.is_computing = False
-                    self.is_paused = False
-                    self.update_button_states()
-                    messagebox.showerror(
-                        "Ошибка", "Сначала задайте начальные условия на первой вкладке!")
-                self.main_frame.after(0, update_ui_on_error)
-                return
+        if not self.parameter_app.initial_conditions:
+            messagebox.showerror(
+                "Ошибка", "Сначала задайте начальные условия на первой вкладке!")
+            return
 
-            if not self.validate_system_parameters() or not self.parameter_app.validate_parameters():
-                def update_ui_on_error():
-                    self.is_computing = False
-                    self.is_paused = False
-                    self.update_button_states()
-                self.main_frame.after(0, update_ui_on_error)
-                return
+        if not self.validate_system_parameters() or not self.parameter_app.validate_parameters():
+            return
 
-            # Параметры системы
-            c = float(self.entries["c"].get())
-            mu = float(self.entries["\u03BC"].get())
-            c_0 = float(self.entries["c\u2080"].get())
-            nu = float(self.entries["\u03BD"].get())
-            epsilon = float(self.entries["\u03B5"].get())
-            d = float(self.entries["d"].get())
-            e = float(self.entries["e"].get())
-            f = float(self.entries["f"].get())
-            D_a = float(self.entries["D\u2090"].get())
-            D_s = float(self.entries["D\u209B"].get())
-            D_y = float(self.entries["D\u1D67"].get())
-            eta = float(self.entries["\u03B7"].get())
+        # СБОР ПАРАМЕТРОВ
+        c = float(self.entries["c"].get())
+        mu = float(self.entries["μ"].get())
+        c_0 = float(self.entries["c₀"].get())
+        nu = float(self.entries["ν"].get())
+        epsilon = float(self.entries["ε"].get())
+        d = float(self.entries["d"].get())
+        e = float(self.entries["e"].get())
+        f = float(self.entries["f"].get())
+        D_a = float(self.entries["Dₐ"].get())
+        D_s = float(self.entries["Dₛ"].get())
+        D_y = float(self.entries["Dᵧ"].get())
+        eta = float(self.entries["η"].get())
 
-            n1 = int(self.parameter_app.entries["n (сетка по x)"].get()) + 1
-            T = float(self.parameter_app.entries["T (время)"].get())
-            m1 = int(self.parameter_app.entries["m (сетка по t)"].get())
-            n2 = (2 * n1) - 1
-            m2 = 4 * m1
+        n1 = int(self.parameter_app.entries["n (сетка по x)"].get()) + 1
+        T = float(self.parameter_app.entries["T (время)"].get())
+        m1 = int(self.parameter_app.entries["m (сетка по t)"].get())
 
-            if continue_from_step == 0:
-                a_0 = np.array([float(self.parameter_app.entries["a_0"][0].get()),
-                                float(
-                                    self.parameter_app.entries["a_0"][1].get()),
-                                float(self.parameter_app.entries["a_0"][2].get())])
-                a_1 = np.array([float(self.parameter_app.entries["a_1"][0].get()),
-                                float(
-                                    self.parameter_app.entries["a_1"][1].get()),
-                                float(self.parameter_app.entries["a_1"][2].get())])
-                a_2 = np.array([float(self.parameter_app.entries["a_2"][0].get()),
-                                float(
-                                    self.parameter_app.entries["a_2"][1].get()),
-                                float(self.parameter_app.entries["a_2"][2].get())])
-                a_3 = np.array([float(self.parameter_app.entries["a_3"][0].get()),
-                                float(
-                                    self.parameter_app.entries["a_3"][1].get()),
-                                float(self.parameter_app.entries["a_3"][2].get())])
-                b_1 = int(self.parameter_app.entries["b_1"].get())
-                b_2 = int(self.parameter_app.entries["b_2"].get())
-                b_3 = int(self.parameter_app.entries["b_3"].get())
+        max_D = max(D_a, D_s, D_y)
+        h1 = 1.0 / (n1 - 1)
+        tau1 = T / m1
+        if tau1 >= h1**2 / (2 * max_D):
+            messagebox.showwarning(
+                "Предупреждение", "Шаг по времени слишком велик! Возможна неустойчивость.")
+            return
 
-                x1 = self.parameter_app.initial_conditions['coarse']['x']
-                a1 = self.parameter_app.initial_conditions['coarse']['a'].copy(
-                )
-                s1 = self.parameter_app.initial_conditions['coarse']['s'].copy(
-                )
-                y1 = self.parameter_app.initial_conditions['coarse']['y'].copy(
-                )
+        # ПОДГОТОВКА ДАННЫХ
+        if continue_from_step == 0:
+            a0 = np.array([float(self.parameter_app.entries[f"a_{i}"][j].get())
+                        for i in range(4) for j in range(3)]).reshape(4, 3)
+            a0, a1, a2, a3 = a0[0], a0[1], a0[2], a0[3]
+            b1 = int(self.parameter_app.entries["b_1"].get())
+            b2 = int(self.parameter_app.entries["b_2"].get())
+            b3 = int(self.parameter_app.entries["b_3"].get())
+            initial_coarse = self.parameter_app.initial_conditions['coarse']
+        else:
+            initial_coarse = {
+                "x": self.base_data[0]["x"],
+                "a": self.current_a1.copy(),
+                "s": self.current_s1.copy(),
+                "y": self.current_y1.copy()
+            }
+            a0 = a1 = a2 = a3 = np.zeros(3)
+            b1 = b2 = b3 = 0
 
-                x2 = np.array([i * 1.0 / (n2-1) for i in range(n2)])
-                a2 = a_0[0] + a_1[0]*np.cos(b_1*np.pi*x2) + a_2[0] * \
-                    np.cos(b_2*np.pi*x2) + a_3[0]*np.cos(b_3*np.pi*x2)
-                s2 = a_0[1] + a_1[1]*np.cos(b_1*np.pi*x2) + a_2[1] * \
-                    np.cos(b_2*np.pi*x2) + a_3[1]*np.cos(b_3*np.pi*x2)
-                y2 = a_0[2] + a_1[2]*np.cos(b_1*np.pi*x2) + a_2[2] * \
-                    np.cos(b_2*np.pi*x2) + a_3[2]*np.cos(b_3*np.pi*x2)
-            else:
-                x1 = self.base_data[0]["x"]
-                a1 = self.current_a1.copy()
-                s1 = self.current_s1.copy()
-                y1 = self.current_y1.copy()
-                x2 = self.control_data[0]["x"]
-                a2 = self.current_a2.copy()
-                s2 = self.current_s2.copy()
-                y2 = self.current_y2.copy()
+        # ЗАПУСК РЕШАТЕЛЯ
+        def run_solver():
+            solver = MeinhardtSolver(
+                c=c, mu=mu, c_0=c_0, nu=nu, epsilon=epsilon, d=d, e=e, f=f, eta=eta,
+                D_a=D_a, D_s=D_s, D_y=D_y,
+                n_coarse=n1, m_coarse=m1, T=T,
+                initial_coarse=initial_coarse,
+                a0=a0, a1=a1, a2=a2, a3=a3,
+                b1=b1, b2=b2, b3=b3,
+                progress_callback=lambda p, s, m: self.progress_queue.put(
+                    (p, s, m))
+            )
+            base_data, control_data, max_a, max_s, max_y = solver.solve()
 
-            L = 1.0
-            h1 = L / (n1 - 1)
-            tau1 = T / m1
-            h2 = L / (n2 - 1)
-            tau2 = T / m2
+            #  ВОЗВРАТ В GUI ПОТОК
+            def finalize():
+                self.base_data = base_data
+                self.control_data = control_data
+                self.max_a_diff = max_a
+                self.max_s_diff = max_s
+                self.max_y_diff = max_y
 
-            max_D = max(D_a, D_s, D_y)
-            # Используем явную схему с контролем шага по времени (условие Куранта)
-            if tau1 >= h1**2 / (2 * max_D) or tau2 >= h2**2 / (2 * max_D):
-                def show_warning():
-                    self.is_computing = False
-                    self.is_paused = False
-                    self.update_button_states()
-                    messagebox.showwarning(
-                        "Предупреждение", "Шаг по времени слишком велик! Возможна неустойчивость.")
-                self.main_frame.after(0, show_warning)
-                return
-
-            a1_new = np.zeros(n1)
-            s1_new = np.zeros(n1)
-            y1_new = np.zeros(n1)
-            a2_new = np.zeros(n2)
-            s2_new = np.zeros(n2)
-            y2_new = np.zeros(n2)
-
-            layers_to_save1 = [0] + [m1 // 5 * i for i in range(1, 6)]
-            layers_to_save2 = [0] + [m2 // 5 * i for i in range(1, 6)]
-            if continue_from_step == 0:
-                self.base_data = []
-                self.control_data = []
-
-            last_progress = -1
-
-            self.start_time = time.time()
-            start_time = time.time()
-
-            for step in range(continue_from_step, m1 + 1):
-                if not self.is_computing:
-                    self.current_a1 = a1.copy()
-                    self.current_s1 = s1.copy()
-                    self.current_y1 = y1.copy()
-                    self.current_a2 = a2.copy()
-                    self.current_s2 = s2.copy()
-                    self.current_y2 = y2.copy()
-                    self.current_step = step
-                    # Сохраняем последний слой, если он еще не сохранен
-                    if step not in [data["layer"] for data in self.base_data]:
-                        self.base_data.append({
-                            "layer": step,
-                            "x": x1.copy(),
-                            "a": a1.copy(),
-                            "s": s1.copy(),
-                            "y": y1.copy()
-                        })
-                        control_step = step * 4
-                        self.control_data.append({
-                            "layer": control_step,
-                            "x": x2.copy(),
-                            "a": a2.copy(),
-                            "s": s2.copy(),
-                            "y": y2.copy()
-                        })
-
-                    def update_ui_on_stop():
-                        self.update_table()
-                        self.plot_base_grid()
-                        self.update_button_states()
-                        self.show_completion_notification(
-                            "Расчёт приостановлен")
-                    self.main_frame.after(0, update_ui_on_stop)
-                    return
-
-                if step in layers_to_save1:
-                    self.base_data.append({"layer": step, "x": x1.copy(),
-                                           "a": a1.copy(), "s": s1.copy(), "y": y1.copy()})
-                control_step = step * 4
-                if control_step in layers_to_save2:
-                    self.control_data.append({"layer": control_step, "x": x2.copy(),
-                                              "a": a2.copy(), "s": s2.copy(), "y": y2.copy()})
-
-                if step > 0:
-                    a_control = a2[::2]
-                    s_control = s2[::2]
-                    y_control = y2[::2]
-                    a_diff = np.abs(a1 - a_control)
-                    s_diff = np.abs(s1 - s_control)
-                    y_diff = np.abs(y1 - y_control)
-                    self.max_a_diff = max(self.max_a_diff, np.max(a_diff))
-                    self.max_s_diff = max(self.max_s_diff, np.max(s_diff))
-                    self.max_y_diff = max(self.max_y_diff, np.max(y_diff))
-
-                if step < m1:
-                    # Явная конечно-разностная схема для внутренних узлов
-                    # du/dt = c*u²*v - μ*u + D∇²u
-                    a1_new[1:-1] = a1[1:-1] + tau1 * (
-                        c * a1[1:-1]**2 * s1[1:-1] - mu * a1[1:-1] +
-                        D_a * (a1[2:] - 2*a1[1:-1] + a1[:-2]) / h1**2
-                    )
-                    s1_new[1:-1] = s1[1:-1] + tau1 * (
-                        c_0 - c * a1[1:-1]**2 * s1[1:-1] - nu * s1[1:-1] -
-                        epsilon * s1[1:-1] * y1[1:-1] +
-                        D_s * (s1[2:] - 2*s1[1:-1] + s1[:-2]) / h1**2
-                    )
-                    y1_new[1:-1] = y1[1:-1] + tau1 * (
-                        d * a1[1:-1] - e * y1[1:-1] +
-                        (eta * y1[1:-1]**2) / (1 + f * y1[1:-1]**2) +
-                        D_y * (y1[2:] - 2*y1[1:-1] + y1[:-2]) / h1**2
-                    )
-
-                    a1_new[0] = a1[0] + tau1 * (
-                        c * a1[0]**2 * s1[0] - mu * a1[0] +
-                        D_a * 2 * (a1[1] - a1[0]) / h1**2
-                    )
-                    s1_new[0] = s1[0] + tau1 * (
-                        c_0 - c * a1[0]**2 * s1[0] - nu * s1[0] -
-                        epsilon * s1[0] * y1[0] +
-                        D_s * 2 * (s1[1] - s1[0]) / h1**2
-                    )
-                    y1_new[0] = y1[0] + tau1 * (
-                        d * a1[0] - e * y1[0] +
-                        (eta * y1[0]**2) / (1 + f * y1[0]**2) +
-                        D_y * 2 * (y1[1] - y1[0]) / h1**2
-                    )
-                    a1_new[n1-1] = a1[n1-1] + tau1 * (
-                        c * a1[n1-1]**2 * s1[n1-1] - mu * a1[n1-1] +
-                        D_a * 2 * (a1[n1-2] - a1[n1-1]) / h1**2
-                    )
-                    s1_new[n1-1] = s1[n1-1] + tau1 * (
-                        c_0 - c * a1[n1-1]**2 * s1[n1-1] - nu * s1[n1-1] -
-                        epsilon * s1[n1-1] * y1[n1-1] +
-                        D_s * 2 * (s1[n1-2] - s1[n1-1]) / h1**2
-                    )
-                    y1_new[n1-1] = y1[n1-1] + tau1 * (
-                        d * a1[n1-1] - e * y1[n1-1] +
-                        (eta * y1[n1-1]**2) / (1 + f * y1[n1-1]**2) +
-                        D_y * 2 * (y1[n1-2] - y1[n1-1]) / h1**2
-                    )
-
-                    a1[:] = a1_new[:]
-                    s1[:] = s1_new[:]
-                    y1[:] = y1_new[:]
-
-                for substep in range(4 if step < m1 else 0):
-                    a2_new[1:-1] = a2[1:-1] + tau2 * (
-                        c * a2[1:-1]**2 * s2[1:-1] - mu * a2[1:-1] +
-                        D_a * (a2[2:] - 2*a2[1:-1] + a2[:-2]) / h2**2
-                    )
-                    s2_new[1:-1] = s2[1:-1] + tau2 * (
-                        c_0 - c * a2[1:-1]**2 * s2[1:-1] - nu * s2[1:-1] -
-                        epsilon * s2[1:-1] * y2[1:-1] +
-                        D_s * (s2[2:] - 2*s2[1:-1] + s2[:-2]) / h2**2
-                    )
-                    y2_new[1:-1] = y2[1:-1] + tau2 * (
-                        d * a2[1:-1] - e * y2[1:-1] +
-                        (eta * y2[1:-1]**2) / (1 + f * y2[1:-1]**2) +
-                        D_y * (y2[2:] - 2*y2[1:-1] + y2[:-2]) / h2**2
-                    )
-
-                    a2_new[0] = a2[0] + tau2 * (
-                        c * a2[0]**2 * s2[0] - mu * a2[0] +
-                        D_a * 2 * (a2[1] - a2[0]) / h2**2
-                    )
-                    s2_new[0] = s2[0] + tau2 * (
-                        c_0 - c * a2[0]**2 * s2[0] - nu * s2[0] -
-                        epsilon * s2[0] * y2[0] +
-                        D_s * 2 * (s2[1] - s2[0]) / h2**2
-                    )
-                    y2_new[0] = y2[0] + tau2 * (
-                        d * a2[0] - e * y2[0] +
-                        (eta * y2[0]**2) / (1 + f * y2[0]**2) +
-                        D_y * 2 * (y2[1] - y2[0]) / h2**2
-                    )
-                    a2_new[n2-1] = a2[n2-1] + tau2 * (
-                        c * a2[n2-1]**2 * s2[n2-1] - mu * a2[n2-1] +
-                        D_a * 2 * (a2[n2-2] - a2[n2-1]) / h2**2
-                    )
-                    s2_new[n2-1] = s2[n2-1] + tau2 * (
-                        c_0 - c * a2[n2-1]**2 * s2[n2-1] - nu * s2[n2-1] -
-                        epsilon * s2[n2-1] * y2[n2-1] +
-                        D_s * 2 * (s2[n2-2] - s2[n2-1]) / h2**2
-                    )
-                    y2_new[n2-1] = y2[n2-1] + tau2 * (
-                        d * (eta * y2[n2-1]**2) / (1 + f * y2[n2-1]**2) +
-                        D_y * 2 * (y2[n2-2] - y2[n2-1]) / h2**2
-                    )
-
-                    a2[:] = a2_new[:]
-                    s2[:] = s2_new[:]
-                    y2[:] = y2_new[:]
-
-                # Обновление прогрессбара каждые 1% прогресса или на последнем шаге
-                progress = (step / m1) * 100
-                if int(progress) > last_progress or step == m1:
-                    last_progress = int(progress)
-                    self.progress_queue.put((progress, step, m1))
-                    time.sleep(0.01)  # Небольшая задержка для освобождения GIL
-
-            def finalize_computation():
                 self.is_computing = False
                 self.is_paused = False
                 self.update_button_states()
                 self.show_completion_notification("Расчёт завершён")
-                self.max_a_diff_label.config(
-                    text=f"Max |a - a*|: {self.max_a_diff:.4f}")
-                self.max_s_diff_label.config(
-                    text=f"Max |s - s*|: {self.max_s_diff:.4f}")
-                self.max_y_diff_label.config(
-                    text=f"Max |y - y*|: {self.max_y_diff:.4f}")
-                end_time = time.time()
-                elapsed_time = end_time - start_time
-                self.time_label.config(
-                    text=f"Время расчета: {elapsed_time:.2f} сек")
+                self.max_a_diff_label.config(text=f"Max |a - a*|: {max_a:.4f}")
+                self.max_s_diff_label.config(text=f"Max |s - s*|: {max_s:.4f}")
+                self.max_y_diff_label.config(text=f"Max |y - y*|: {max_y:.4f}")
                 self.update_table()
                 self.plot_base_grid()
-            self.main_frame.after(0, finalize_computation)
+            self.main_frame.after(0, finalize)
 
-        except ValueError as e:
-            def handle_value_error():
-                self.progressbar["value"] = 0
-                self.progress_label.config(text=f"Прогресс: 0% (0/{m1})")
-                self.is_computing = False
-                self.is_paused = False
-                self.update_button_states()
-                end_time = time.time()
-                elapsed_time = end_time - self.start_time
-                self.time_label.config(
-                    text=f"Время расчета: {elapsed_time:.2f} сек")
-                messagebox.showerror(
-                    "Проверьте введенные параметры: все значения должны быть числами!")
-            self.main_frame.after(0, handle_value_error)
-        except Exception as e:
-            def handle_general_error():
-                self.progressbar["value"] = 0
-                self.progress_label.config(text=f"Прогресс: 0% (0/{m1})")
-                self.is_computing = False
-                self.is_paused = False
-                self.update_button_states()
-                end_time = time.time()
-                elapsed_time = end_time - self.start_time
-                self.time_label.config(
-                    text=f"Время расчета: {elapsed_time:.2f} сек")
-                messagebox.showerror("Ошибка", f"Произошла ошибка: {str(e)}")
-                self.main_frame.after(0, handle_general_error)
+        threading.Thread(target=run_solver, daemon=True).start()
 
     def plot_base_grid(self):
         self.last_plotted_grid = "base"
