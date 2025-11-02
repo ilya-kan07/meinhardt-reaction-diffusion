@@ -41,3 +41,4 @@ git clone https://github.com/твой_ник/reaction-diffusion-solver.git
 cd reaction-diffusion-solver
 pip install -r requirements.txt
 python src/main.py
+# Test CI
