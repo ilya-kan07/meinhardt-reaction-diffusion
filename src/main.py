@@ -9,13 +9,12 @@ import queue
 import time
 import math
 import os
-import re
-import sys
 from tkinter import simpledialog
 from src.utils.paths import get_resource_path, get_results_dir
 from src.config.presets import PRESETS
 from src.core.initial_conditions import compute_initial_conditions
 from src.core.solver import MeinhardtSolver
+from src.utils.parameter_reader import read_parameters
 
 
 class ParameterApp:
@@ -1393,63 +1392,6 @@ class MainApp:
         except Exception as e:
             messagebox.showerror(
                 "Ошибка", f"Не удалось сохранить параметры: {str(e)}")
-
-
-def read_parameters(filename):
-    """
-    Читает параметры из файла parameters.txt, созданного при сохранении результатов.
-    Возвращает словарь с начальными условиями, параметрами сетки и системы.
-    """
-    params = {}
-    current_section = None
-    with open(filename, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            if line in ["Начальные условия:", "Параметры сетки:", "Параметры системы:"]:
-                current_section = line
-                continue
-            if current_section == "Начальные условия:":
-                if line.startswith("a_"):
-                    # Пример: a_0: a=1.0, s=0.5, y=0.2
-                    match = re.match(
-                        r"(a_\d+)\:\s*a=([\d.]+),\s*s=([\d.]+),\s*y=([\d.]+)", line)
-                    if match:
-                        key = match.group(1)
-                        a_val = float(match.group(2))
-                        s_val = float(match.group(3))
-                        y_val = float(match.group(4))
-                        params[key] = [a_val, s_val, y_val]
-                    else:
-                        raise ValueError(f"Некорректный формат строки: {line}")
-                elif line.startswith("b_"):
-                    # Пример: b_1: 1
-                    key, value = line.split(":")
-                    params[key.strip()] = int(value.strip())
-            elif current_section == "Параметры сетки:":
-                # Пример: n (сетка по x): 10
-                key, value = line.split(":")
-                key = key.strip()
-                value = value.strip()
-                params[key] = int(value) if key in [
-                    "n (сетка по x)", "m (сетка по t)"] else float(value)
-            elif current_section == "Параметры системы:":
-                # Пример: c: 16.67
-                key, value = line.split(":")
-                params[key.strip()] = float(value.strip())
-    # Проверка наличия всех необходимых параметров
-    required_initial = ["a_0", "a_1", "a_2", "a_3", "b_1", "b_2", "b_3"]
-    required_grid = ["n (сетка по x)", "m (сетка по t)", "T (время)"]
-    required_system = ["c", "μ", "c₀", "ν", "ε",
-                       "d", "e", "f", "η", "Dₐ", "Dₛ", "Dᵧ"]
-    missing = []
-    missing.extend([key for key in required_initial if key not in params])
-    missing.extend([key for key in required_grid if key not in params])
-    missing.extend([key for key in required_system if key not in params])
-    if missing:
-        raise ValueError(f"Отсутствуют необходимые параметры: {missing}")
-    return params
 
 
 if __name__ == "__main__":
