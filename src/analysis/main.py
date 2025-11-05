@@ -1,9 +1,15 @@
+"""
+GUI для аналитического исследования модели Мейнхардта.
+"""
 import tkinter as tk
 from tkinter import ttk
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from .config.parameters import SYSTEM_PARAMS, EQUILIBRIUM_PARAMS, SPATIAL_PARAMS, INITIAL_PARAMS
+
+from .config.parameters import (
+    SYSTEM_PARAMS, EQUILIBRIUM_PARAMS, SPATIAL_PARAMS, INITIAL_PARAMS
+)
 from .core.stability import calculate_stability_matrix
 from .core.newton import newton_method
 from .core.graphs import find_graphs
@@ -88,28 +94,26 @@ def create_parameters_tab(tab_name):
     # Функция для расчета матрицы
     def calculate_matrix():
         try:
-            params = {
-                'c': float(entries["с"].get()),
-                'mu': float(entries["μ"].get()),
-                'C0': float(entries["С₀"].get()),
-                'V': float(entries["V"].get()),
-                'eps': float(entries["ɛ"].get()),
-                'd': float(entries["d"].get()),
-                'e': float(entries["e"].get()),
-                'f': float(entries["f"].get()),
-                'eta': float(entries["η"].get()),
-                'Da': float(entries["Da"].get()),
-                'Ds': float(entries["Ds"].get()),
-                'Dy': float(entries["Dy"].get()),
-                'a': float(equilibrium_entries["a"].get()),
-                's': float(equilibrium_entries["s"].get()),
-                'y': float(equilibrium_entries["y"].get()),
-                'k': float(spatial_entries["k"].get()),
-                'L': float(spatial_entries["L"].get())
-            }
-
             # Вызываем вычислительную функцию
-            result = calculate_stability_matrix(**params)
+            result = calculate_stability_matrix(
+                c=float(entries["с"].get()),
+                mu=float(entries["μ"].get()),
+                C0=float(entries["С₀"].get()),
+                V=float(entries["V"].get()),
+                eps=float(entries["ɛ"].get()),
+                d=float(entries["d"].get()),
+                e=float(entries["e"].get()),
+                f=float(entries["f"].get()),
+                eta=float(entries["η"].get()),
+                Da=float(entries["Da"].get()),
+                Ds=float(entries["Ds"].get()),
+                Dy=float(entries["Dy"].get()),
+                a_eq=float(equilibrium_entries["a"].get()),
+                s_eq=float(equilibrium_entries["s"].get()),
+                y_eq=float(equilibrium_entries["y"].get()),
+                k=float(spatial_entries["k"].get()),
+                L=float(spatial_entries["L"].get())
+            )
 
             if 'error' in result:
                 output_text.delete(1.0, tk.END)
@@ -265,9 +269,9 @@ def create_newton_tab():
                 e=float(newton_entries["e"].get()),
                 f=float(newton_entries["f"].get()),
                 eta=float(newton_entries["η"].get()),
-                a=float(newton_initial_entries["a"].get()),
-                s=float(newton_initial_entries["s"].get()),
-                y=float(newton_initial_entries["y"].get()),
+                x0=(float(newton_initial_entries["a"].get()),
+                    float(newton_initial_entries["s"].get()),
+                    float(newton_initial_entries["y"].get())),
                 max_iter=max_iterations
             )
 

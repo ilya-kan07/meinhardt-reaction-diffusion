@@ -1,50 +1,63 @@
+"""
+Решение нелинейной системы уравнений Мейнхардта методом Ньютона.
+"""
 import numpy as np
+from typing import Tuple
 
 
-def newton_method(c, mu, C0, V, eps, d, e, f, eta, a, s, y, max_iter):
-    x = np.array([a, s, y])
+def newton_method(
+    c: float, mu: float, C0: float, V: float, eps: float,
+    d: float, e: float, f: float, eta: float,
+    x0: Tuple[float, float, float],
+    max_iter: int = 100,
+    tol: float = 1e-8
+) -> Tuple[int, np.ndarray, float, float, float, float]:
+    """
+    Решает систему F(x) = 0 методом Ньютона.
 
-    max_iterations = max_iter
-    tolerance = 1e-6
+    Returns:
+        iterations, solution, f1, f2, f3, residual_norm
+    """
+    x = np.array(x0, dtype=float)
+    a, s, y = x
 
-    iteration = 0
-
-    while iteration < max_iterations:
-        f1 = c * x[0]**2 * x[1] - mu * x[0]
-        f2 = C0 - c * x[0]**2 * x[1] - V * x[1] - eps * x[1] * x[2]
-        f3 = d * x[0] - e * x[2] + (eta * x[2]**2) / (1 + f * x[2]**2)
+    for iteration in range(max_iter):
+        # Остаточная функция
+        f1 = c * a**2 * s - mu * a
+        f2 = C0 - c * a**2 * s - V * s - eps * s * y
+        f3 = d * a - e * y + (eta * y**2) / (1 + f * y**2)
         F = np.array([f1, f2, f3])
 
-        if np.linalg.norm(F) < tolerance:
-            break
+        if np.linalg.norm(F) < tol:
+            residual_norm = np.linalg.norm(F)
+            return iteration + 1, x, f1, f2, f3, residual_norm
 
-        J11 = 2 * c * x[0] * x[1] - mu
-        J12 = c * x[0]**2
+        # Якобиан
+        J11 = 2 * c * a * s - mu
+        J12 = c * a**2
         J13 = 0
-        J21 = -2 * c * x[0] * x[1]
-        J22 = -c * x[0]**2 - V - eps * x[2]
-        J23 = -eps * x[1]
+        J21 = -2 * c * a * s
+        J22 = -c * a**2 - V - eps * y
+        J23 = -eps * s
         J31 = d
         J32 = 0
-        J33 = -e + (2 * eta * x[2] * (1 + f * x[2]**2) - 2 *
-                    f * x[2]**3 * eta) / (1 + f * x[2]**2)**2
+        J33 = -e + (2 * eta * y * (1 + f * y**2) - 2 *
+                    f * y**3 * eta) / (1 + f * y**2)**2
 
-        J = np.array([
-            [J11, J12, J13],
-            [J21, J22, J23],
-            [J31, J32, J33]
-        ])
+        J = np.array([[J11, J12, J13], [J21, J22, J23], [J31, J32, J33]])
 
-        delta_x = np.linalg.solve(J, -F)
+        try:
+            delta = np.linalg.solve(J, -F)
+        except np.linalg.LinAlgError:
+            break
 
-        x = x + delta_x
+        x += delta
+        a, s, y = x
 
-        iteration += 1
+    # Финальная невязка
+    f1 = c * a**2 * s - mu * a
+    f2 = C0 - c * a**2 * s - V * s - eps * s * y
+    f3 = d * a - e * y + (eta * y**2) / (1 + f * y**2)
+    residual_norm = np.linalg.norm([f1, f2, f3])
 
-    f1 = c * x[0]**2 * x[1] - mu * x[0]
-    f2 = C0 - c * x[0]**2 * x[1] - V * x[1] - eps * x[1] * x[2]
-    f3 = d * x[0] - e * x[2] + (eta * x[2]**2) / (1 + f * x[2]**2)
-    F = np.array([f1, f2, f3])
-    residual_norm = np.linalg.norm(F)
-
-    return iteration, x, f1, f2, f3, residual_norm
+    return max_iter, x, f1, f2, f3, residual_norm

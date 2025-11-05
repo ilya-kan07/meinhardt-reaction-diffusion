@@ -17,20 +17,20 @@ SYSTEM_PARAMS: List[Tuple[str, float]] = [
 ]
 
 # Равновесие
-EQUILIBRIUM_PARAMS = [
+EQUILIBRIUM_PARAMS: List[Tuple[str, float]] = [
     ("a", 0.512934),
     ("s", 0.140341),
     ("y", 1.006568)
 ]
 
 # Пространственные параметры
-SPATIAL_PARAMS = [
+SPATIAL_PARAMS: List[Tuple[str, float]] = [
     ("k", 1.0),
     ("L", 1.0)
 ]
 
 # параметры начального приближения в методе Ньютона
-INITIAL_PARAMS = [
+INITIAL_PARAMS: List[Tuple[str, float]] = [
     ("a", 0.5),
     ("s", 0.5),
     ("y", 0.5)

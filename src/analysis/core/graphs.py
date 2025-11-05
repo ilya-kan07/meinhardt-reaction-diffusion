@@ -1,7 +1,24 @@
+"""
+Модуль для построения графиков системы Мейнхардта:
+- s(a)
+- a+(y), a-(y)
+- a(y)
+- Поиск точек пересечения
+"""
 import numpy as np
+from typing import Tuple, List
 
 
-def find_graphs(c, mu, C0, V, eps, d, e, f, eta):
+def find_graphs(
+    c: float, mu: float, C0: float, V: float, eps: float,
+    d: float, e: float, f: float, eta: float
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, List[Tuple[float, float, float]]]:
+    """
+    Вычисляет графики функций и точки пересечения.
+
+    Returns:
+        a, s_a, y, aplus_y, aminus_y, a_y, intersections
+    """
     a = np.linspace(0.001, 1, 100)
     s_a = mu / (c * a)
 
