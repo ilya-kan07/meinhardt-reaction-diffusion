@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from src.analysis.core.graphs import find_graphs
+from analysis.src.core.graphs import find_graphs
 
 # Ожидаемые координаты точек пересечения
 EXPECTED: list[tuple[float]] = [

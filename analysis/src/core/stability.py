@@ -39,7 +39,6 @@ def calculate_stability_matrix(
     b2 = (J11 * J22 + J11 * J33 + J22 * J33 - J12 * J21)
     b3 = -(J11 * J22 * J33 - J12 * J21 * J33 + J12 * J23 * J31)
     b = b1 * b2 - b3
-    print(b0, b1, b2, b3, b)
     stability = b1 > 0 and b3 > 0 and b > 0
 
     Jk11 = J11 - kappa2 * Da
@@ -57,7 +56,6 @@ def calculate_stability_matrix(
     bk2 = (Jk11 * Jk22 + Jk11 * Jk33 + Jk22 * Jk33 - Jk12 * Jk21)
     bk3 = -(Jk11 * Jk22 * Jk33 - Jk12 * Jk21 * Jk33 + Jk12 * Jk23 * Jk31)
     bk = bk1 * bk2 - bk3
-    print(bk0, bk1, bk2, bk3, bk)
     stability_k = bk1 > 0 and bk3 > 0 and bk > 0
 
     k_values = np.arange(0, 11)

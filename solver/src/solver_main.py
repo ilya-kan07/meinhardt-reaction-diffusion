@@ -10,11 +10,11 @@ import time
 import math
 import os
 from tkinter import simpledialog
-from src.utils.paths import get_resource_path, get_results_dir
-from src.config.presets import PRESETS
-from src.core.initial_conditions import compute_initial_conditions
-from src.core.solver import MeinhardtSolver
-from src.utils.parameter_reader import read_parameters
+from solver.src.utils.paths import get_resource_path, get_results_dir
+from solver.src.config.presets import PRESETS
+from solver.src.core.initial_conditions import compute_initial_conditions
+from solver.src.core.solver import MeinhardtSolver
+from solver.src.utils.parameter_reader import read_parameters
 
 
 class ParameterApp:
@@ -1394,7 +1394,10 @@ class MainApp:
                 "Ошибка", f"Не удалось сохранить параметры: {str(e)}")
 
 
-if __name__ == "__main__":
+def main():
     root = tk.Tk()
     app = MainApp(root)
     root.mainloop()
+
+if __name__ == "__main__":
+    main()

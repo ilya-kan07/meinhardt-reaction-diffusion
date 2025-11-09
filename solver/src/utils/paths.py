@@ -11,7 +11,7 @@ def get_base_path() -> Path:
         return Path(sys.executable).parent
 
     current_path = Path(__file__).resolve()
-    project_root = current_path.parent.parent.parent
+    project_root = current_path.parent.parent.parent.parent
     return project_root
 
 

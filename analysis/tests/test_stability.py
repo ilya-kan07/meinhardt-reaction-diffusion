@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from src.analysis.core.stability import calculate_stability_matrix
-from src.analysis.config.parameters import (
+from analysis.src.core.stability import calculate_stability_matrix
+from analysis.src.config.parameters import (
     SYSTEM_PARAMS, EQUILIBRIUM_PARAMS, SPATIAL_PARAMS
 )
 

@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
-from src.analysis.config.parameters import SYSTEM_PARAMS
-from src.analysis.core.newton import newton_method
+from analysis.src.config.parameters import SYSTEM_PARAMS
+from analysis.src.core.newton import newton_method
+
 
 def _system_params() -> dict:
     return {name: value for name, value in SYSTEM_PARAMS}

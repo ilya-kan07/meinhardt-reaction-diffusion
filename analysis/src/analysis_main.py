@@ -14,27 +14,35 @@ from .core.stability import calculate_stability_matrix
 from .core.newton import newton_method
 from .core.graphs import find_graphs
 
-# Создаем главное окно
-root = tk.Tk()
-root.title("Исследование системы реакции диффузии Мейнхардта | Кандрушин И.Б.")
-root.geometry("1280x900")
 
+def create_gui():
+    root = tk.Tk()
+    root.title("Исследование системы реакции диффузии Мейнхардта | Кандрушин И.Б.")
+    root.geometry("1280x900")
 
-def on_closing():
-    plt.close('all')
-    root.destroy()
+    def on_closing():
+        plt.close('all')
+        root.destroy()
 
+    root.protocol("WM_DELETE_WINDOW", on_closing)
 
-root.protocol("WM_DELETE_WINDOW", on_closing)
+    # Создаем вкладки
+    notebook = ttk.Notebook(root)
+    notebook.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
 
-# Создаем вкладки
-notebook = ttk.Notebook(root)
-notebook.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
+    create_parameters_tab(notebook)
+    create_newton_tab(notebook)
+    create_solutions_tab(notebook)
+
+    root.columnconfigure(0, weight=1)
+    root.rowconfigure(0, weight=1)
+
+    return root
 
 # Функция для создания вкладки "Подбор параметров"
-def create_parameters_tab(tab_name):
+def create_parameters_tab(notebook):
     tab = ttk.Frame(notebook)
-    notebook.add(tab, text=tab_name)
+    notebook.add(tab, text="Подбор параметров")
 
     button_frame = ttk.Frame(tab)
     button_frame.grid(row=0, column=0, pady=5, sticky="ew")
@@ -212,7 +220,7 @@ def create_parameters_tab(tab_name):
 
 
 # Функция для создания вкладки "Метод Ньютона"
-def create_newton_tab():
+def create_newton_tab(notebook):
     tab = ttk.Frame(notebook)
     notebook.add(tab, text="Метод Ньютона")
 
@@ -314,7 +322,7 @@ def create_newton_tab():
     tab.rowconfigure(2, weight=1)
 
 
-def create_solutions_tab():
+def create_solutions_tab(notebook):
     tab = ttk.Frame(notebook)
     notebook.add(tab, text="Расчет состояний равновесия")
 
@@ -478,11 +486,10 @@ def create_solutions_tab():
     tab.rowconfigure(3, weight=1)
 
 
-create_parameters_tab("Подбор параметров")
-create_newton_tab()
-create_solutions_tab()
+def main():
+    root = create_gui()
+    root.mainloop()
 
-root.columnconfigure(0, weight=1)
-root.rowconfigure(0, weight=1)
 
-root.mainloop()
+if __name__ == "__main__":
+    main()

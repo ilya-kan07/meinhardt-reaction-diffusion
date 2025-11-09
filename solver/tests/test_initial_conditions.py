@@ -1,6 +1,6 @@
 import numpy as np
-from src.core.initial_conditions import compute_initial_conditions
-from src.config.presets import PRESETS
+from solver.src.core.initial_conditions import compute_initial_conditions
+from solver.src.config.presets import PRESETS
 
 
 def test_initial_conditions_preset_1():

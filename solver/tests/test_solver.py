@@ -1,7 +1,7 @@
 import numpy as np
 import copy
-from src.core.solver import MeinhardtSolver
-from src.config.presets import PRESETS
+from solver.src.core.solver import MeinhardtSolver
+from solver.src.config.presets import PRESETS
 
 ETALON_PRESET_1 = {
     "final_a": np.array([1.040017, 1.040016, 1.040015, 1.040014, 1.040014, 1.040015, 1.040016, 1.040016, 1.040016, 1.040015, 1.040014]),
