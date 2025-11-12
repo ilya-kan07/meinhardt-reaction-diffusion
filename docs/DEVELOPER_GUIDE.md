@@ -2,53 +2,54 @@
 
 ## Структура проекта (monorepo)
 
-meinhardt-reaction-diffusion/
-├── solver/                                 # Программа для численного решения
-│   ├── src/
-|   |   ├── config/
-|   |   |   └── presets.py                  # Наборы параметров
-|   |   ├── core/
-|   |   |   ├── initial_conditions.py       # Вычисление начальных условий
-|   |   |   └── solver.py                   # Явная схема для численного решения
-|   |   ├── gui/
-|   |   ├── utils/
-|   |   |   ├── parameter_reader.py         # Чтение параметров из файла
-|   |   |   └── paths.py                    # Пути для сохранения и чтения данных
-│   │   └── solver_main.py                  # GUI + основная логика
-│   └── tests/                              # Unit-тесты
-│       ├── test_initial_conditions.py      # Проверка начальных условий
-|       └── test_solver.py                  # Проверка численного решения
-├── analysis/                       # Программа для аналитического исследования
-|   ├── src/
-|   |   ├── config/
-|   |   |   └── parameters.py       # Основные параметры
-|   |   ├── core/
-|   |   |   ├── graphs.py           # Построение графиков
-|   |   |   ├── newton.py           # Метод Ньютона
-|   |   |   └── stability.py        # Анализ устойчивости равновесия
-|   |   └── analysis_main.py        # GUI и основная логика
-│   └── tests/                      # Unit-тесты
-|       ├── test_graphs.py          # Проверка координат точек пересечения
-|       ├── test_newton.py          # Проверка метода Ньютона
-│       └── test_stability.py       # Проверка коэффициентов полинома
-├── docs/                    # Документация
-|   ├── images/
-|   ├── DEVELOPER_GUIDE.md
-|   ├── REPORT.md
-|   └── USER_GUIDE.md
-├── resources/               # Ресурсы для программ
-|   ├── conditions.png
-|   ├── main_conditions.png
-|   └── parameters.txt
-├── requirements.txt            # Зависимости
-├── pytest.ini
-├── .github/workflows/tests.yml
-├── .gitignore
-├── LICENSE
-├── README.md
-├── run_solver.py            # Точка входа (solver)
-└── run_analysis.py          # Точка входа (analysis)
-
+```text
+    meinhardt-reaction-diffusion/
+    ├── solver/                                 # Программа для численного решения
+    │   ├── src/
+    |   |   ├── config/
+    |   |   |   └── presets.py                  # Наборы параметров
+    |   |   ├── core/
+    |   |   |   ├── initial_conditions.py       # Вычисление начальных условий
+    |   |   |   └── solver.py                   # Явная схема для численного решения
+    |   |   ├── gui/
+    |   |   ├── utils/
+    |   |   |   ├── parameter_reader.py         # Чтение параметров из файла
+    |   |   |   └── paths.py                    # Пути для сохранения и чтения данных
+    │   │   └── solver_main.py                  # GUI + основная логика
+    │   └── tests/                              # Unit-тесты
+    │       ├── test_initial_conditions.py      # Проверка начальных условий
+    |       └── test_solver.py                  # Проверка численного решения
+    ├── analysis/                       # Программа для аналитического исследования
+    |   ├── src/
+    |   |   ├── config/
+    |   |   |   └── parameters.py       # Основные параметры
+    |   |   ├── core/
+    |   |   |   ├── graphs.py           # Построение графиков
+    |   |   |   ├── newton.py           # Метод Ньютона
+    |   |   |   └── stability.py        # Анализ устойчивости равновесия
+    |   |   └── analysis_main.py        # GUI и основная логика
+    │   └── tests/                      # Unit-тесты
+    |       ├── test_graphs.py          # Проверка координат точек пересечения
+    |       ├── test_newton.py          # Проверка метода Ньютона
+    │       └── test_stability.py       # Проверка коэффициентов полинома
+    ├── docs/                    # Документация
+    |   ├── images/
+    |   ├── DEVELOPER_GUIDE.md
+    |   ├── REPORT.md
+    |   └── USER_GUIDE.md
+    ├── resources/               # Ресурсы для программ
+    |   ├── conditions.png
+    |   ├── main_conditions.png
+    |   └── parameters.txt
+    ├── requirements.txt            # Зависимости
+    ├── pytest.ini
+    ├── .github/workflows/tests.yml
+    ├── .gitignore
+    ├── LICENSE
+    ├── README.md
+    ├── run_solver.py            # Точка входа (solver)
+    └── run_analysis.py          # Точка входа (analysis)
+```
 
 ## Описание ключевых файлов
 
@@ -102,7 +103,7 @@ meinhardt-reaction-diffusion/
  ```bash
    pytest -v
 ```
-3. **Запусти тесты**:
+3. **Сделай Pull Request**:
 ```bash
     git add docs/DEVELOPER_GUIDE.md
     git commit -m "docs: add detailed file descriptions to developer guide"
