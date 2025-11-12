@@ -3,6 +3,7 @@
 [![Tests](https://github.com/ilya-kan07/meinhardt-reaction-diffusion/actions/workflows/tests.yml/badge.svg)](https://github.com/ilya-kan07/meinhardt-reaction-diffusion/actions/workflows/tests.yml)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/ilya-kan07/meinhardt-reaction-diffusion?label=download)](https://github.com/ilya-kan07/meinhardt-reaction-diffusion/releases/latest)
 
 ## Описание
 
