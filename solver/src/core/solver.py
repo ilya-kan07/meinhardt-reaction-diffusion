@@ -1,9 +1,7 @@
-# src/core/solver.py
 from typing import List, Dict, Optional, Callable
 import numpy as np
 from numpy.typing import NDArray
 
-# Типы для возврата данных
 LayerData = Dict[str, NDArray]
 GridData = List[LayerData]
 
