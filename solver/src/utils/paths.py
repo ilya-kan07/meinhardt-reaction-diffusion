@@ -1,18 +1,18 @@
 from pathlib import Path
 import sys
-from typing import Final
 
 
 def get_base_path() -> Path:
     """
-    Возвращает корень проекта (где лежит resources/, results/)
+    Возвращает корень, откуда берутся resources/ и results/.
+
+    * В обычном режиме (python run_solver.py) – корень проекта.
+    * В exe (PyInstaller) – временная папка _MEIPASS.
     """
     if getattr(sys, 'frozen', False):
-        return Path(sys.executable).parent
-
-    current_path = Path(__file__).resolve()
-    project_root = current_path.parent.parent.parent.parent
-    return project_root
+        return Path(sys._MEIPASS)
+    else:
+        return Path(__file__).resolve().parent.parent.parent.parent
 
 
 def get_resource_path(filename: str) -> Path:
