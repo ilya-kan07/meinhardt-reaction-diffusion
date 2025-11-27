@@ -49,3 +49,6 @@ results/
 # *.png
 # *.txt
 info.txt
+
+# файл с бд игнорируем
+*.db

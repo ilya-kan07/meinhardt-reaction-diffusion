@@ -15,6 +15,7 @@ from solver.src.config.presets import PRESETS
 from solver.src.core.initial_conditions import compute_initial_conditions
 from solver.src.core.solver import MeinhardtSolver
 from solver.src.utils.parameter_reader import read_parameters
+from solver.src.database import save_calculation
 
 
 class ParameterApp:
@@ -1353,51 +1354,37 @@ class MainApp:
                 "Ошибка", "Нет данных для сохранения. Сначала выполните расчет!")
             return
 
-        folder_name = simpledialog.askstring(
-            "Сохранение результатов", "Введите название результата:", parent=self.root)
-        if not folder_name:
-            messagebox.showwarning(
-                "Предупреждение", "Имя папки не указано. Сохранение отменено.")
+        name = simpledialog.askstring("Сохранение", "Введите название эксперимента:", parent=self.root)
+        if not name:
             return
 
-        save_dir = get_results_dir() / folder_name
-        save_dir.mkdir(parents=True, exist_ok=True)
+        note = simpledialog.askstring(
+            "Комментарий", "Добавить заметку (необязательно):", parent=self.root)
 
-        self.parameter_app.save_initial_conditions_plot(save_dir)
-        self.numerical_app.save_solution_plots(save_dir)
-
-        # Сохранение параметров в текстовый файл
         try:
-            with open(os.path.join(save_dir, "parameters.txt"), 'w', encoding='utf-8') as f:
-                f.write("Начальные условия:\n")
-                for key in ["a_0", "a_1", "a_2", "a_3"]:
-                    a, s, y = self.parameter_app.entries[key]
-                    f.write(f"{key}: a={a.get()}, s={s.get()}, y={y.get()}\n")
-                for i in range(1, 4):
-                    b = self.parameter_app.entries[f"b_{i}"].get()
-                    f.write(f"b_{i}: {b}\n")
-
-                f.write("\nПараметры сетки:\n")
-                for param in ["n (сетка по x)", "m (сетка по t)", "T (время)"]:
-                    value = self.parameter_app.entries[param].get()
-                    f.write(f"{param}: {value}\n")
-
-                f.write("\nПараметры системы:\n")
-                for param in ["c", "\u03BC", "c\u2080", "\u03BD", "\u03B5", "d", "e", "f", "\u03B7", "D\u2090", "D\u209B", "D\u1D67"]:
-                    value = self.numerical_app.entries[param].get()
-                    f.write(f"{param}: {value}\n")
-
-            messagebox.showinfo(
-                "Успех", f"Результаты и параметры сохранены в {save_dir}")
+            calc_id = save_calculation(
+                name=name,
+                parameter_app=self.parameter_app,
+                numerical_app=self.numerical_app,
+                base_data=self.numerical_app.base_data,
+                control_data=self.numerical_app.control_data,
+                max_diffs=(
+                    self.numerical_app.max_a_diff,
+                    self.numerical_app.max_s_diff,
+                    self.numerical_app.max_y_diff
+                ),
+                note=note
+            )
+            messagebox.showinfo("Успех", f"Эксперимент «{name}» сохранён в базу!\nID: {calc_id}")
         except Exception as e:
-            messagebox.showerror(
-                "Ошибка", f"Не удалось сохранить параметры: {str(e)}")
+            messagebox.showerror("Ошибка", f"Не удалось сохранить в БД:\n{e}")
 
 
 def main():
     root = tk.Tk()
     app = MainApp(root)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()
