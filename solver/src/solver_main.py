@@ -573,13 +573,18 @@ class NumericalSolutionApp:
         self.radio_frame = ttk.LabelFrame(
             self.left_frame, text="Выбор таблицы")
         self.radio_frame.pack(fill="x", pady=2)
+
+        radio_inner_frame = ttk.Frame(self.radio_frame)
+        radio_inner_frame.pack(padx=10, pady=8)
+
         self.table_mode = tk.StringVar(value="a")
-        ttk.Radiobutton(self.radio_frame, text="Функция a", variable=self.table_mode,
-                        value="a", command=self.switch_table).pack(anchor="w", padx=5, pady=2)
-        ttk.Radiobutton(self.radio_frame, text="Функция s", variable=self.table_mode,
-                        value="s", command=self.switch_table).pack(anchor="w", padx=5, pady=2)
-        ttk.Radiobutton(self.radio_frame, text="Функция y", variable=self.table_mode,
-                        value="y", command=self.switch_table).pack(anchor="w", padx=5, pady=2)
+
+        ttk.Radiobutton(radio_inner_frame, text="a(x,t)", variable=self.table_mode,
+                        value="a", command=self.switch_table).grid(row=0, column=0, padx=20)
+        ttk.Radiobutton(radio_inner_frame, text="s(x,t)", variable=self.table_mode,
+                        value="s", command=self.switch_table).grid(row=0, column=1, padx=20)
+        ttk.Radiobutton(radio_inner_frame, text="y(x,t)", variable=self.table_mode,
+                        value="y", command=self.switch_table).grid(row=0, column=2, padx=20)
 
         self.create_max_diff_frame()
         self.create_progress_and_controls()
