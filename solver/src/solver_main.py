@@ -16,6 +16,7 @@ from solver.src.core.initial_conditions import compute_initial_conditions
 from solver.src.core.solver import MeinhardtSolver
 from solver.src.utils.parameter_reader import read_parameters
 from solver.src.database import save_calculation
+from solver.src.history_tab import HistoryTab
 
 
 class ParameterApp:
@@ -1347,6 +1348,8 @@ class MainApp:
         self.parameter_app = ParameterApp(
             self.tab1, self.numerical_app.update_system_parameters)
         self.numerical_app.parameter_app = self.parameter_app
+
+        self.history_tab = HistoryTab(self.notebook)
 
     def save_results(self):
         if not self.numerical_app.base_data:

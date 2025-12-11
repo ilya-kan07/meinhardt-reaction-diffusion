@@ -228,3 +228,88 @@ def save_calculation(
         raise e
     finally:
         conn.close()
+
+
+def get_calculation_list() -> List[Dict]:
+    """Возвращает список всех сохранённых расчётов для отображения в таблице"""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            c.id, c.name, c.created_at, c.note,
+            c.max_a_diff, c.max_s_diff, c.max_y_diff,
+            g.n, g.m, g.T
+        FROM calculations c
+        LEFT JOIN grid_parameters g ON g.calculation_id = c.id
+        ORDER BY c.created_at DESC
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def load_calculation(calc_id: int) -> Dict[str, Any]:
+    """Загружает ВСЁ по ID расчёта: параметры, начальные условия и все слои"""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    # Основные данные
+    cur.execute("SELECT * FROM calculations WHERE id = ?", (calc_id,))
+    calc = dict(cur.fetchone())
+
+    # Сетка
+    cur.execute(
+        "SELECT * FROM grid_parameters WHERE calculation_id = ?", (calc_id,))
+    calc["grid"] = dict(cur.fetchone())
+
+    # Системные параметры
+    cur.execute(
+        "SELECT * FROM system_parameters WHERE calculation_id = ?", (calc_id,))
+    calc["system"] = dict(cur.fetchone())
+
+    # Начальные условия
+    cur.execute(
+        "SELECT * FROM initial_conditions WHERE calculation_id = ?", (calc_id,))
+    init = dict(cur.fetchone())
+    calc["initial"] = {
+        "b": [init["b1"], init["b2"], init["b3"]],
+        "a0": np.array([init["a_A0"], init["s_A0"], init["y_A0"]]),
+        "a1": np.array([init["a_A1"], init["s_A1"], init["y_A1"]]),
+        "a2": np.array([init["a_A2"], init["s_A2"], init["y_A2"]]),
+        "a3": np.array([init["a_A3"], init["s_A3"], init["y_A3"]]),
+    }
+
+    # Все слои (и базовые, и контрольные)
+    cur.execute("""
+        SELECT layer, is_control, x, a, s, y, a_diff, s_diff, y_diff
+        FROM solution_layers
+        WHERE calculation_id = ?
+        ORDER BY layer
+    """, (calc_id,))
+    layers = []
+    for row in cur.fetchall():
+        r = dict(row)
+        layers.append({
+            "layer": r["layer"],
+            "is_control": bool(r["is_control"]),
+            "x": bytes_to_numpy(r["x"]),
+            "a": bytes_to_numpy(r["a"]),
+            "s": bytes_to_numpy(r["s"]),
+            "y": bytes_to_numpy(r["y"]),
+            "a_diff": bytes_to_numpy(r["a_diff"]),
+            "s_diff": bytes_to_numpy(r["s_diff"]),
+            "y_diff": bytes_to_numpy(r["y_diff"]),
+        })
+    calc["layers"] = layers
+
+    conn.close()
+    return calc
+
+
+def delete_calculation(calc_id: int):
+    """Удаляет расчёт и все связанные данные (ON DELETE CASCADE сделает остальное)"""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM calculations WHERE id = ?", (calc_id,))
+    conn.commit()
+    conn.close()
