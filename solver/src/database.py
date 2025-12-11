@@ -172,25 +172,26 @@ def save_calculation(
             s_base = base_layer["s"]
             y_base = base_layer["y"]
 
-            # Ищем соответствующий контрольный слой (layer_num * 4)
-            control_layer = next(
-                (c for c in control_data if c["layer"] == layer_num * 4), None)
-            a_control_interp = control_layer["a"][::
-                                                  2] if control_layer is not None else None
-            s_control_interp = control_layer["s"][::
-                                                  2] if control_layer is not None else None
-            y_control_interp = control_layer["y"][::
-                                                  2] if control_layer is not None else None
+            # Находим соответствующий контрольный слой
+            control_layer = None
+            for cl in control_data:
+                if cl["layer"] == layer_num * 4:
+                    control_layer = cl
+                    break
 
-            # Разности только для базовой сетки
-            a_diff = np.abs(
-                a_base - a_control_interp) if a_control_interp is not None else None
-            s_diff = np.abs(
-                s_base - s_control_interp) if s_control_interp is not None else None
-            y_diff = np.abs(
-                y_base - y_control_interp) if y_control_interp is not None else None
+            # Интерполируем контрольную сетку на узлы базовой (для погрешности)
+            if control_layer is not None:
+                a_control_interp = np.interp(x_base, control_layer["x"], control_layer["a"])
+                s_control_interp = np.interp(x_base, control_layer["x"], control_layer["s"])
+                y_control_interp = np.interp(x_base, control_layer["x"], control_layer["y"])
 
-            # Сохраняем базовую сетку
+                a_diff = np.abs(a_base - a_control_interp)
+                s_diff = np.abs(s_base - s_control_interp)
+                y_diff = np.abs(y_base - y_control_interp)
+            else:
+                a_diff = s_diff = y_diff = None
+
+            # Сохраняем базовый слой (с погрешностью)
             cur.execute("""
                 INSERT INTO solution_layers
                 (calculation_id, layer, is_control, x, a, s, y, a_diff, s_diff, y_diff)
@@ -206,12 +207,12 @@ def save_calculation(
                 numpy_to_bytes(y_diff) if y_diff is not None else None,
             ))
 
-            # Сохраняем контрольную сетку (без разностей)
+            # Сохраняем контрольный слой (без погрешности)
             if control_layer is not None:
                 cur.execute("""
                     INSERT INTO solution_layers
-                    (calculation_id, layer, is_control, x, a, s, y, a_diff, s_diff, y_diff)
-                    VALUES (?, ?, 1, ?, ?, ?, ?, NULL, NULL, NULL)
+                    (calculation_id, layer, is_control, x, a, s, y)
+                    VALUES (?, ?, 1, ?, ?, ?, ?)
                 """, (
                     calc_id, layer_num * 4,
                     numpy_to_bytes(control_layer["x"]),

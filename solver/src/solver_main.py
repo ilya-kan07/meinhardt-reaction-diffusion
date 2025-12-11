@@ -15,8 +15,10 @@ from solver.src.config.presets import PRESETS
 from solver.src.core.initial_conditions import compute_initial_conditions
 from solver.src.core.solver import MeinhardtSolver
 from solver.src.utils.parameter_reader import read_parameters
+from solver.src.utils.save_txt import save_results_to_txt
 from solver.src.database import save_calculation
 from solver.src.history_tab import HistoryTab
+
 
 
 class ParameterApp:
@@ -1365,6 +1367,7 @@ class MainApp:
             "Комментарий", "Добавить заметку (необязательно):", parent=self.root)
 
         try:
+            # 1. Сохраняем в базу (как было)
             calc_id = save_calculation(
                 name=name,
                 parameter_app=self.parameter_app,
@@ -1378,9 +1381,32 @@ class MainApp:
                 ),
                 note=note
             )
-            messagebox.showinfo("Успех", f"Эксперимент «{name}» сохранён в базу!\nID: {calc_id}")
+
+            # 2. Сохраняем в текстовый файл
+            from solver.src.utils.save_txt import save_results_to_txt
+            txt_path = save_results_to_txt(
+                name=name,
+                calc_id=calc_id,
+                parameter_app=self.parameter_app,
+                numerical_app=self.numerical_app,
+                base_data=self.numerical_app.base_data,
+                control_data=self.numerical_app.control_data,
+                max_diffs=(
+                    self.numerical_app.max_a_diff,
+                    self.numerical_app.max_s_diff,
+                    self.numerical_app.max_y_diff
+                ),
+                note=note
+            )
+
+            messagebox.showinfo(
+                "Успех",
+                f"Эксперимент «{name}» сохранён!\n"
+                f"• В базу данных (ID: {calc_id})\n"
+                f"• В файл: {txt_path.name}"
+            )
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Не удалось сохранить в БД:\n{e}")
+            messagebox.showerror("Ошибка", f"Не удалось сохранить:\n{e}")
 
 
 def main():

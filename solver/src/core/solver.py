@@ -73,9 +73,9 @@ class MeinhardtSolver:
         self.max_s_diff = 0.0
         self.max_y_diff = 0.0
 
-        # Слои для сохранения (0%, 20%, 40%, 60%, 80%, 100%)
-        self.layers_to_save1 = [0] + [self.m1 // 5 * i for i in range(1, 6)]
-        self.layers_to_save2 = [0] + [self.m2 // 5 * i for i in range(1, 6)]
+        # Сохраняем ВСЕ слои (каждый шаг по времени)
+        self.layers_to_save1 = list(range(self.m1 + 1))        # 0, 1, 2, ..., m1
+        self.layers_to_save2 = [i * 4 for i in range(self.m1 + 1)]  # 0, 4, 8, ..., m1*4
 
     def _save_if_needed(self, step: int):
         """Сохраняет слой, если он в списке layers_to_save"""
@@ -128,9 +128,25 @@ class MeinhardtSolver:
         last_progress = -1
 
         for step in range(self.m1 + 1):
-            # Сохранение начального слоя
-            if step == 0:
-                self._save_if_needed(0)
+            # === Сохраняем ВСЕ слои ===
+            self.base_data.append({
+                "layer": step,
+                "x": self.x1.copy(),
+                "a": self.a1.copy(),
+                "s": self.s1.copy(),
+                "y": self.y1.copy()
+            })
+
+            # Контрольная сетка — сохраняем соответствующий момент
+            control_step = step * 4
+            if control_step <= self.m2:
+                self.control_data.append({
+                    "layer": control_step,
+                    "x": self.x2.copy(),
+                    "a": self.a2.copy(),
+                    "s": self.s2.copy(),
+                    "y": self.y2.copy()
+                })
 
             # Прогресс
             if self.progress_callback:
@@ -139,11 +155,7 @@ class MeinhardtSolver:
                     last_progress = int(progress)
                     self.progress_callback(progress, step, self.m1)
 
-            # Сохранение промежуточных слоёв
-            if step > 0:
-                self._save_if_needed(step)
-
-            # Обновление разницы
+            # Обновляем максимальные разности
             self._update_control_diff(step)
 
             # Явная схема на грубой сетке
