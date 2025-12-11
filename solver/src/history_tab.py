@@ -10,10 +10,8 @@ class HistoryTab:
     def __init__(self, notebook):
         self.frame = ttk.Frame(notebook)
         notebook.add(self.frame, text="История")
-
         self.current_calc = None
         self.setup_ui()
-        self.refresh_list()
 
     def setup_ui(self):
             # === Левая панель ===
@@ -73,8 +71,34 @@ class HistoryTab:
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH,
                          expand=True, padx=(5, 10), pady=10)
 
-        # Выбор слоя — больше не нужен (все слои на графике)
-        # ttk.Label(...) и Combobox удаляем
+        control_frame = ttk.LabelFrame(right_frame, text=" Отображение слоёв ", padding=10)
+        control_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.display_mode = tk.StringVar(value="auto")
+
+        modes = [
+            ("auto", "Авто (6 равномерно)"),
+            ("every", "Каждый N-й"),
+            ("single", "Один слой")
+        ]
+        for i, (mode, text) in enumerate(modes):
+            ttk.Radiobutton(control_frame, text=text, variable=self.display_mode,
+                            value=mode, command=self.on_display_mode_change).grid(row=0, column=i, padx=15, sticky="w")
+
+        # Поле ввода
+        self.entry_var = tk.StringVar(value="10")
+        self.entry_n = ttk.Entry(control_frame, textvariable=self.entry_var, width=12, font=("Consolas", 11))
+        self.entry_n.grid(row=0, column=3, padx=(30, 5))
+
+        # КНОПКА "Показать" — вот она!
+        show_btn = ttk.Button(control_frame, text="Показать", command=self.on_show_button)
+        show_btn.grid(row=0, column=4, padx=(0, 10))
+
+        # Автообновление при нажатии Enter в поле
+        self.entry_n.bind("<Return>", lambda e: self.on_show_button())
+        self.entry_n.bind("<FocusOut>", lambda e: self.on_show_button())  # при потере фокуса
+
+        # По умолчанию поле выключено
 
         # === Три графика в ряд ===
         plot_frame = ttk.Frame(right_frame)
@@ -120,6 +144,70 @@ class HistoryTab:
         sb.pack(side=tk.RIGHT, fill=tk.Y)
         self.table.configure(yscrollcommand=sb.set)
 
+    def on_show_button(self):
+        """Вызывается по кнопке «Показать» или Enter"""
+        # Проверяем, что введено число
+        text = self.entry_var.get().strip()
+        if not text:
+            return
+        try:
+            int(text)
+        except ValueError:
+            messagebox.showwarning("Ошибка", "Введите целое число!")
+            return
+
+        # Если режим "every" или "single" — обновляем графики
+        if self.display_mode.get() in ("every", "single"):
+            self.show_selected_layers()
+
+    def toggle_entry_state(self, *args):
+        mode = self.display_mode.get()
+        state = "normal" if mode in ("every", "single") else "disabled"
+        self.entry_n.config(state=state)
+        # При "auto" — сразу показываем 6 слоёв
+        if mode == "auto":
+            self.show_selected_layers()
+
+    def get_layers_to_display(self):
+        """Возвращает список базовых слоёв для отображения в зависимости от режима"""
+        if not self.current_calc:
+            return []
+
+        base_layers = [l for l in self.current_calc["layers"] if not l["is_control"]]
+        if not base_layers:
+            return []
+
+        mode = self.display_mode.get()
+
+        if mode == "auto":
+            # 6 равномерно распределённых (включая первый и последний)
+            total = len(base_layers)
+            if total <= 6:
+                return base_layers
+            indices = [0] + [int(i * (total - 1) / 5) for i in range(1, 6)] + [total - 1]
+            indices = sorted(set(indices))  # на всякий случай убираем дубли
+            return [base_layers[i] for i in indices]
+
+        elif mode == "every":
+            try:
+                step = max(1, int(self.entry_var.get() or 10))
+            except:
+                step = 10
+            return base_layers[::step]
+
+        elif mode == "single":
+            try:
+                target = int(self.entry_var.get() or 0)
+            except:
+                target = 0
+            # Ищем ближайший доступный слой
+            for layer in base_layers:
+                if layer["layer"] >= target:
+                    return [layer]
+            return [base_layers[-1]] if base_layers else []
+
+        return base_layers  # fallback
+
     def refresh_list(self):
         for i in self.tree.get_children():
             self.tree.delete(i)
@@ -139,10 +227,14 @@ class HistoryTab:
         try:
             self.current_calc = load_calculation(calc_id)
             self.display_parameters()
-            # Убрали всё про layer_combo — его больше нет!
-            self.show_all_layers()  # ← теперь сразу показываем все слои
+            # ← ВАЖНО: сбрасываем режим на "auto" при выборе нового расчёта
+            self.display_mode.set("auto")
+            self.toggle_entry_state()  # это вызовет show_selected_layers()
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось загрузить:\n{e}")
+
+    def on_display_mode_change(self):
+        self.toggle_entry_state()
 
     def display_parameters(self):
         # Очистка
@@ -256,153 +348,144 @@ class HistoryTab:
         if base_layers:
             self.layer_combo.current(0)
 
-    def show_all_layers(self):
+    def show_selected_layers(self):
         if not self.current_calc:
+            for ax in self.axes:
+                ax.cla()
+            self.canvas_plot.draw()
             return
 
-        layers = self.current_calc["layers"]
-        base_layers = [l for l in layers if not l["is_control"]]
-        if not base_layers:
+        layers_to_show = self.get_layers_to_display()
+        if not layers_to_show:
+            for ax in self.axes:
+                ax.cla()
+            self.canvas_plot.draw()
             return
 
-        # === Цвета как во второй вкладке ===
-        colors = ['red', 'blue', 'green', 'orange', 'purple', 'black']
+        colors = ['red', 'orange', 'green', 'blue', 'purple', 'black']
 
-        # Очистка
+        # Очистка графиков
         for ax in self.axes:
             ax.cla()
 
-        # === Рисуем все слои с жирными линиями ===
-        for idx, layer in enumerate(base_layers):
+        # Рисуем выбранные слои
+        for idx, layer in enumerate(layers_to_show):
             x = layer["x"]
             a, s, y = layer["a"], layer["s"], layer["y"]
             t = layer["layer"]
-
             color = colors[idx % len(colors)]
-            # Жирные линии: обычные — 1.8, последний — 3.5
             lw = 1.6
-            alpha = 1.0
+            label = f"t = {t}"
 
-            # Рисуем на всех трёх графиках
-            self.axes[0].plot(x, a, color=color, linewidth=lw, alpha=alpha)
-            self.axes[1].plot(x, s, color=color, linewidth=lw, alpha=alpha)
-            self.axes[2].plot(x, y, color=color, linewidth=lw, alpha=alpha)
+            self.axes[0].plot(x, a, color=color, linewidth=lw, label=label)
+            self.axes[1].plot(x, s, color=color, linewidth=lw, label=label)
+            self.axes[2].plot(x, y, color=color, linewidth=lw, label=label)
 
-            # Добавляем в легенду каждого графика
-            label = f"Слой = {t}"
-            # пустой plot только для легенды
-            self.axes[0].plot([], [], color=color, linewidth=lw, label=label)
-            self.axes[1].plot([], [], color=color, linewidth=lw, label=label)
-            self.axes[2].plot([], [], color=color, linewidth=lw, label=label)
-
-        # === Оформление каждого графика ===
+        # Оформление графиков
         titles = ["a(x,t)", "s(x,t)", "y(x,t)"]
-        ylabels = ["a(x,t)", "s(x,t)", "y(x,t)"]
+        show_legend = True
+
+        if self.display_mode.get() == "every":
+            show_legend = False
 
         for i, ax in enumerate(self.axes):
             ax.set_title(titles[i], fontsize=13, pad=15)
             ax.set_xlabel("x", fontsize=11)
-            ax.set_ylabel(ylabels[i], fontsize=11)
-            ax.grid(True, alpha=0.35, linewidth=0.7)
+            ax.set_ylabel(titles[i], fontsize=11)
+            ax.grid(True, alpha=0.35)
             ax.tick_params(labelsize=10)
-
-            # Легенда на КАЖДОМ графике — с цветом и номером слоя
-            ax.legend(fontsize=9.5, loc="upper right",
-                      framealpha=0.95, fancybox=True, shadow=True)
-
-        # Единые пределы по Y
-        for ax in self.axes:
             ax.set_ylim(-1.0, 2.0)
+            if show_legend:
+                ax.legend(fontsize=9.5, loc="upper right", framealpha=0.92, shadow=True)
 
-        self.fig.tight_layout()
+        # Вместо tight_layout — фиксированные отступы (чтобы не было предупреждений)
+        self.fig.subplots_adjust(left=0.06, right=0.98, top=0.88, bottom=0.14, wspace=0.28)
         self.canvas_plot.draw()
 
-        # Данные для таблицы
-        control_layers = [l for l in layers if l["is_control"]]
-        self.base_layers = base_layers
-        self.control_map = {l["layer"]: l for l in control_layers}
+        # === КЛЮЧЕВОЕ: правильно создаём control_map ===
+        all_layers = self.current_calc["layers"]
+        self.control_map = {l["layer"]: l for l in all_layers if l["is_control"]}
+
+        # Сохраняем для таблицы
+        self.layers_to_show = layers_to_show
         self.update_table()
 
     def update_table(self):
-        func = self.var_function.get()  # "a", "s" или "y"
+        func = self.var_function.get()
 
-        # Подписи колонок в зависимости от выбранной функции
-        if func == "a":
-            base_label = "a(x,t)"
-            control_label = "a*(x,t)"
-            diff_label = "|a−a*|"
-        elif func == "s":
-            base_label = "s(x,t)"
-            control_label = "s*(x,t)"
-            diff_label = "|s−s*|"
-        else:  # y
-            base_label = "y(x,t)"
-            control_label = "y*(x,t)"
-            diff_label = "|y−y*|"
+        labels = {"a": ("a(x,t)", "a*(x,t)", "|a−a*|"),
+                  "s": ("s(x,t)", "s*(x,t)", "|s−s*|"),
+                  "y": ("y(x,t)", "y*(x,t)", "|y−y*|")}
 
-        # Обновляем заголовки
-        self.table.heading("value_base", text=base_label)
-        self.table.heading("value_control", text=control_label)
-        self.table.heading("diff", text=diff_label)
+        self.table.heading("value_base", text=labels[func][0])
+        self.table.heading("value_control", text=labels[func][1])
+        self.table.heading("diff", text=labels[func][2])
 
-        # Очищаем таблицу
         for item in self.table.get_children():
             self.table.delete(item)
 
-        if not hasattr(self, 'base_layers') or not self.base_layers:
+        if not hasattr(self, 'layers_to_show') or not self.layers_to_show:
             return
 
-        # Заполняем данными
-        for base in self.base_layers:
+        for base in self.layers_to_show:
             t_base = base["layer"]
-            t_control = t_base * 4
-            control = self.control_map.get(t_control)
-
-            if control is None:
+            control = self.control_map.get(t_base * 4)
+            if not control:
                 continue
 
             x_base = base["x"]
             x_control = control["x"]
 
-            # Выбираем функцию
             if func == "a":
                 val_base = base["a"]
                 val_control = np.interp(x_base, x_control, control["a"])
             elif func == "s":
                 val_base = base["s"]
                 val_control = np.interp(x_base, x_control, control["s"])
-            else:  # y
+            else:
                 val_base = base["y"]
                 val_control = np.interp(x_base, x_control, control["y"])
 
             diff = np.abs(val_base - val_control)
 
-            # Заполняем строки — ВСЁ ПО ЦЕНТРУ + разница 6 знаков после запятой
             for i in range(len(x_base)):
                 self.table.insert("", "end", values=(
-                    f"{t_base}/{t_control}",           # Слой
-                    f"{x_base[i]:.6f}",                # x — 6 знаков
-                    f"{val_base[i]:.6f}",              # Базовая
-                    f"{val_control[i]:.6f}",           # Контрольная
-                    # Разница — 6 знаков после запятой
+                    t_base,
+                    f"{x_base[i]:.6f}",
+                    f"{val_base[i]:.6f}",
+                    f"{val_control[i]:.6f}",
                     f"{diff[i]:.6f}"
                 ))
 
     def delete_selected(self):
         sel = self.tree.selection()
         if not sel:
-            messagebox.showwarning("Выберите", "Выберите расчёт")
+            messagebox.showwarning("Выберите", "Выберите расчёт для удаления")
             return
-        if messagebox.askyesno("Удалить?", "Удалить расчёт навсегда?"):
-            calc_id = self.tree.item(sel[0])["values"][0]
+
+        if not messagebox.askyesno("Подтверждение", "Удалить выбранный расчёт навсегда?"):
+            return
+
+        calc_id = self.tree.item(sel[0])["values"][0]
+
+        try:
             delete_calculation(calc_id)
             self.refresh_list()
-            for col in (self.left_col, self.right_col):
-                for w in col.winfo_children():
-                    w.destroy()
+
+            # Полная очистка правой панели и графиков
+            for widget in self.params_frame.winfo_children():
+                widget.destroy()
+
             for ax in self.axes:
                 ax.cla()
             self.canvas_plot.draw()
+
             self.table.delete(*self.table.get_children())
-            self.layer_combo.set('')
-            messagebox.showinfo("Готово", "Расчёт удалён")
+
+            # Сбрасываем текущий расчёт
+            self.current_calc = None
+
+            messagebox.showinfo("Готово", "Расчёт успешно удалён")
+
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось удалить расчёт:\n{e}")

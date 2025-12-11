@@ -4,6 +4,7 @@ import numpy as np
 from io import BytesIO
 from typing import List, Dict, Any, Optional, Tuple
 import os
+import blosc2
 
 # Путь к базе данных — в корне проекта
 DB_PATH = Path(__file__).parent.parent.parent / "meinhardt_results.db"
@@ -15,19 +16,17 @@ def get_conn():
     conn.row_factory = sqlite3.Row
     return conn
 
+def numpy_to_bytes(arr: Optional[np.ndarray]) -> Optional[bytes]:
+    if arr is None:
+        return None
+    # Явно указываем, что данные — float32 (4 байта)
+    return blosc2.compress(arr.astype(np.float32).tobytes(), typesize=4)
 
-def numpy_to_bytes(arr: np.ndarray) -> bytes:
-    buf = BytesIO()
-    np.save(buf, arr)
-    return buf.getvalue()
-
-
-def bytes_to_numpy(blob: bytes) -> np.ndarray:
+def bytes_to_numpy(blob: Optional[bytes]) -> Optional[np.ndarray]:
     if blob is None:
         return None
-    buf = BytesIO(blob)
-    return np.load(buf)
-
+    raw = blosc2.decompress(blob)
+    return np.frombuffer(raw, dtype=np.float32).astype(np.float64)
 
 def init_db():
     conn = get_conn()
@@ -202,9 +201,9 @@ def save_calculation(
                 numpy_to_bytes(a_base),
                 numpy_to_bytes(s_base),
                 numpy_to_bytes(y_base),
-                numpy_to_bytes(a_diff) if a_diff is not None else None,
-                numpy_to_bytes(s_diff) if s_diff is not None else None,
-                numpy_to_bytes(y_diff) if y_diff is not None else None,
+                numpy_to_bytes(a_diff),
+                numpy_to_bytes(s_diff),
+                numpy_to_bytes(y_diff),
             ))
 
             # Сохраняем контрольный слой (без погрешности)
@@ -233,6 +232,7 @@ def save_calculation(
 
 def get_calculation_list() -> List[Dict]:
     """Возвращает список всех сохранённых расчётов для отображения в таблице"""
+    init_db()
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -251,6 +251,7 @@ def get_calculation_list() -> List[Dict]:
 
 def load_calculation(calc_id: int) -> Dict[str, Any]:
     """Загружает ВСЁ по ID расчёта: параметры, начальные условия и все слои"""
+    init_db()
     conn = get_conn()
     cur = conn.cursor()
 
@@ -308,9 +309,28 @@ def load_calculation(calc_id: int) -> Dict[str, Any]:
 
 
 def delete_calculation(calc_id: int):
-    """Удаляет расчёт и все связанные данные (ON DELETE CASCADE сделает остальное)"""
+    """Удаляет расчёт и все связанные данные + сбрасывает автонумерацию, если таблица стала пустой"""
+    init_db()
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("DELETE FROM calculations WHERE id = ?", (calc_id,))
-    conn.commit()
-    conn.close()
+
+    try:
+        # Удаляем расчёт
+        cur.execute("DELETE FROM calculations WHERE id = ?", (calc_id,))
+        conn.commit()
+
+        # Проверяем, остались ли вообще расчёты
+        cur.execute("SELECT COUNT(*) FROM calculations")
+        count = cur.fetchone()[0]
+
+        # Если таблица пуста — сбрасываем счётчик AUTOINCREMENT
+        if count == 0:
+            # Это магия SQLite: сбрасываем внутренний счётчик
+            cur.execute("DELETE FROM sqlite_sequence WHERE name='calculations'")
+            conn.commit()
+
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
