@@ -788,13 +788,88 @@ class NumericalSolutionApp:
         self.layer_frame = ttk.LabelFrame(
             self.left_frame, text="Режим отображения графиков")
         self.layer_frame.pack(fill="x", pady=2)
+
+        # Переменная режима
         self.layer_mode = tk.StringVar(value="Последний слой")
-        self.layer_selector = ttk.Combobox(
-            self.layer_frame, textvariable=self.layer_mode, state="readonly")
-        self.layer_selector['values'] = ("Последний слой", "Несколько слоев")
-        self.layer_selector.pack(fill="x", padx=5, pady=5)
-        self.layer_selector.bind(
-            "<<ComboboxSelected>>", self.on_layer_mode_change)
+
+        # Combobox для выбора режима
+        self.mode_selector = ttk.Combobox(
+            self.layer_frame,
+            textvariable=self.layer_mode,
+            values=("Последний слой", "Несколько слоёв", "Выбрать слой"),
+            state="readonly",
+            width=20
+        )
+        self.mode_selector.pack(padx=5, pady=5, anchor="w")
+        self.mode_selector.bind("<<ComboboxSelected>>", self.on_layer_mode_change)
+
+        # Фрейм для выбора конкретного слоя (изначально скрыт)
+        self.single_layer_frame = ttk.Frame(self.layer_frame)
+
+        ttk.Label(self.single_layer_frame, text="Слой:").pack(side="left", padx=(5, 2))
+        self.layer_combobox = ttk.Combobox(
+            self.single_layer_frame, state="readonly", width=10)
+        self.layer_combobox.pack(side="left", padx=2)
+        self.layer_combobox.bind("<<ComboboxSelected>>", lambda e: self.update_plots())
+
+    def on_layer_mode_change(self, event=None):
+        mode = self.layer_mode.get()
+
+        # Скрываем/показываем выбор конкретного слоя
+        if mode == "Выбрать слой":
+            self.single_layer_frame.pack(fill="x", padx=5, pady=2)
+            self.update_layer_list()  # заполняем список доступных слоёв
+        else:
+            self.single_layer_frame.pack_forget()
+
+        # Если данных ещё нет — не падаем
+        if not self.base_data:
+            return
+
+        self.update_plots()
+
+    def update_layer_list(self):
+        """Заполняет combobox со списком доступных слоёв"""
+        if not self.base_data:
+            self.layer_combobox['values'] = []
+            return
+
+        layers = [str(data["layer"]) for data in self.base_data]
+        self.layer_combobox['values'] = layers
+        if layers:
+            self.layer_combobox.current(len(layers) - 1)  # по умолчанию последний
+
+    def get_selected_layers(self):
+        """Возвращает список индексов слоёв, которые нужно отобразить"""
+        if not self.base_data:
+            return []
+
+        mode = self.layer_mode.get()
+
+        if mode == "Последний слой":
+            return [len(self.base_data) - 1]                     # только последний
+
+        elif mode == "Несколько слоёв":
+            total = len(self.base_data)
+            if total <= 1:
+                return list(range(total))
+            # Равномерно 6 точек (включая 0 и последний)
+            indices = [0]
+            for i in range(1, 5):
+                indices.append(int(i * (total - 1) / 5))
+            indices.append(total - 1)
+            return sorted(set(indices))  # на всякий случай убираем дубли
+
+        elif mode == "Выбрать слой":
+            try:
+                selected = self.layer_combobox.current()
+                if selected >= 0:
+                    return [selected]
+            except:
+                pass
+            return [len(self.base_data) - 1]  # fallback
+
+        return [len(self.base_data) - 1]
 
     def on_layer_mode_change(self, event):
         if self.layer_mode.get() == "Несколько слоев" and (self.is_computing or self.is_paused):
@@ -909,8 +984,6 @@ class NumericalSolutionApp:
         self.max_a_diff = 0.0
         self.max_s_diff = 0.0
         self.max_y_diff = 0.0
-        self.layer_mode.set("Последний слой")
-        self.layer_selector.set("Последний слой")
         self.update_button_states()
         while not self.progress_queue.empty():
             self.progress_queue.get()
@@ -1074,6 +1147,7 @@ class NumericalSolutionApp:
                 self.max_a_diff_label.config(text=f"Max |a - a*|: {max_a:.4f}")
                 self.max_s_diff_label.config(text=f"Max |s - s*|: {max_s:.4f}")
                 self.max_y_diff_label.config(text=f"Max |y - y*|: {max_y:.4f}")
+                self.update_layer_list()
                 self.update_table()
                 self.plot_base_grid()
             self.main_frame.after(0, finalize)
@@ -1089,6 +1163,9 @@ class NumericalSolutionApp:
         self.plot_grid(self.control_data, "Контрольная сетка")
 
     def plot_grid(self, data, title_prefix):
+        if not data:
+            return
+
         limits = self.parameter_app.get_axis_limits()
         if not limits:
             return
@@ -1096,8 +1173,10 @@ class NumericalSolutionApp:
         self.ax1.clear()
         self.ax2.clear()
         self.ax3.clear()
-        colors = ['red', 'blue', 'green', 'orange', 'purple', 'black']
+
+        colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'black']
         mode = self.layer_mode.get()
+        indices_to_plot = self.get_selected_layers()
 
         if mode == "Последний слой":
             layer_data = data[-1]
@@ -1113,8 +1192,24 @@ class NumericalSolutionApp:
                           label=f'Слой {layer}', color=colors[2])
             self.ax3.plot(x_vals, y_vals,
                           label=f'Слой {layer}', color=colors[0])
+        elif mode == "Выбрать слой":
+            for idx in indices_to_plot:
+                layer_data = data[idx]
+                x_vals = layer_data["x"]
+                a_vals = layer_data["a"]
+                s_vals = layer_data["s"]
+                y_vals = layer_data["y"]
+                layer = layer_data["layer"]
+
+            self.ax1.plot(x_vals, a_vals,
+                          label=f'Слой {layer}', color=colors[1])
+            self.ax2.plot(x_vals, s_vals,
+                          label=f'Слой {layer}', color=colors[2])
+            self.ax3.plot(x_vals, y_vals,
+                          label=f'Слой {layer}', color=colors[0])
         else:
-            for idx, layer_data in enumerate(data):
+            for idx in indices_to_plot:
+                layer_data = data[idx]
                 x_vals = layer_data["x"]
                 a_vals = layer_data["a"]
                 s_vals = layer_data["s"]
@@ -1254,80 +1349,58 @@ class NumericalSolutionApp:
         if not self.base_data or not self.control_data:
             return
 
-        display_last_layer = self.layer_mode.get() == "Последний слой"
-        x_base = self.base_data[0]["x"]
+        # <-- НОВАЯ ЧАСТЬ: определяем, какие слои показывать в таблице -->
+        indices_to_show = self.get_selected_layers()      # те же индексы, что и на графиках
+        if not indices_to_show:
+            return
 
+        # Последний выбранный слой нужен для подписи «Слой X/Y» в таблице
+        last_base_idx = indices_to_show[-1]
+        base_layer = self.base_data[last_base_idx]
+        control_layer = self.control_data[last_base_idx]
+        layer_display = f"{base_layer['layer']}/{control_layer['layer']}"
+
+        x_base = self.base_data[0]["x"]
         n = int(self.parameter_app.entries["n (сетка по x)"].get())
         x_precision = math.ceil(math.log10(n)) + 1 if n > 2 else 1
+        # <-- КОНЕЦ НОВОЙ ЧАСТИ -->
 
+        # Очистка текущей таблицы
         if mode == "a":
-            for item in self.a_tree.get_children():
-                self.a_tree.delete(item)
-            if display_last_layer:
-                base_layer = self.base_data[-1]
-                control_layer = self.control_data[-1]
-                layer_display = f"{base_layer['layer']}/{control_layer['layer']}"
-                a_control = control_layer["a"][::2]
-                a_diff = np.abs(base_layer["a"] - a_control)
-                for i in range(len(x_base)):
-                    self.a_tree.insert("", "end", values=(
-                        layer_display, f"{x_base[i]:.{x_precision}f}",
-                        f"{base_layer['a'][i]:.6f}", f"{a_control[i]:.6f}", f"{a_diff[i]:.6f}"))
-            else:
-                for base_layer, control_layer in zip(self.base_data, self.control_data):
-                    layer_display = f"{base_layer['layer']}/{control_layer['layer']}"
-                    a_control = control_layer["a"][::2]
-                    a_diff = np.abs(base_layer["a"] - a_control)
-                    for i in range(len(x_base)):
-                        self.a_tree.insert("", "end", values=(
-                            layer_display, f"{x_base[i]:.{x_precision}f}",
-                            f"{base_layer['a'][i]:.6f}", f"{a_control[i]:.6f}", f"{a_diff[i]:.6f}"))
-
+            tree = self.a_tree
         elif mode == "s":
-            for item in self.s_tree.get_children():
-                self.s_tree.delete(item)
-            if display_last_layer:
-                base_layer = self.base_data[-1]
-                control_layer = self.control_data[-1]
-                layer_display = f"{base_layer['layer']}/{control_layer['layer']}"
-                s_control = control_layer["s"][::2]
-                s_diff = np.abs(base_layer["s"] - s_control)
-                for i in range(len(x_base)):
-                    self.s_tree.insert("", "end", values=(
-                        layer_display, f"{x_base[i]:.{x_precision}f}",
-                        f"{base_layer['s'][i]:.6f}", f"{s_control[i]:.6f}", f"{s_diff[i]:.6f}"))
-            else:
-                for base_layer, control_layer in zip(self.base_data, self.control_data):
-                    layer_display = f"{base_layer['layer']}/{control_layer['layer']}"
-                    s_control = control_layer["s"][::2]
-                    s_diff = np.abs(base_layer["s"] - s_control)
-                    for i in range(len(x_base)):
-                        self.s_tree.insert("", "end", values=(
-                            layer_display, f"{x_base[i]:.{x_precision}f}",
-                            f"{base_layer['s'][i]:.6f}", f"{s_control[i]:.6f}", f"{s_diff[i]:.6f}"))
-
+            tree = self.s_tree
         else:
-            for item in self.y_tree.get_children():
-                self.y_tree.delete(item)
-            if display_last_layer:
-                base_layer = self.base_data[-1]
-                control_layer = self.control_data[-1]
-                layer_display = f"{base_layer['layer']}/{control_layer['layer']}"
-                y_control = control_layer["y"][::2]
-                y_diff = np.abs(base_layer["y"] - y_control)
-                for i in range(len(x_base)):
-                    self.y_tree.insert("", "end", values=(
-                        layer_display, f"{x_base[i]:.{x_precision}f}",
-                        f"{base_layer['y'][i]:.6f}", f"{y_control[i]:.6f}", f"{y_diff[i]:.6f}"))
-            else:
-                for base_layer, control_layer in zip(self.base_data, self.control_data):
-                    layer_display = f"{base_layer['layer']}/{control_layer['layer']}"
-                    y_control = control_layer["y"][::2]
-                    y_diff = np.abs(base_layer["y"] - y_control)
-                    for i in range(len(x_base)):
-                        self.y_tree.insert("", "end", values=(
-                            layer_display, f"{x_base[i]:.{x_precision}f}",
-                            f"{base_layer['y'][i]:.6f}", f"{y_control[i]:.6f}", f"{y_diff[i]:.6f}"))
+            tree = self.y_tree
+
+        for item in tree.get_children():
+            tree.delete(item)
+
+        # Заполняем таблицу только выбранными слоями
+        for idx in indices_to_show:
+            base = self.base_data[idx]
+            control = self.control_data[idx]
+
+            if mode == "a":
+                val_base = base["a"]
+                val_control = control["a"][::2]
+            elif mode == "s":
+                val_base = base["s"]
+                val_control = control["s"][::2]
+            else:  # "y"
+                val_base = base["y"]
+                val_control = control["y"][::2]
+
+            diff = np.abs(val_base - val_control)
+
+            for i in range(len(x_base)):
+                tree.insert("", "end", values=(
+                    f"{base['layer']}/{control['layer']}",          # номер слоя базовой/контрольной
+                    f"{x_base[i]:.{x_precision}f}",
+                    f"{val_base[i]:.6f}",
+                    f"{val_control[i]:.6f}",
+                    f"{diff[i]:.6f}"
+                ))
 
 
 class MainApp:
