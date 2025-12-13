@@ -1129,12 +1129,20 @@ class NumericalSolutionApp:
                 progress_callback=lambda p, s, m: self.progress_queue.put(
                     (p, s, m))
             )
-            base_data, control_data, max_a, max_s, max_y = solver.solve()
+            (
+                base_data,              # полные данные для текущей сессии (все слои)
+                control_data,           # полные данные для текущей сессии
+                base_data_for_db,       # прореженные для сохранения в БД
+                control_data_for_db,    # прореженные для сохранения в БД
+                max_a, max_s, max_y
+            ) = solver.solve()
 
             #  ВОЗВРАТ В GUI ПОТОК
             def finalize():
                 self.base_data = base_data
                 self.control_data = control_data
+                self.base_data_for_db = base_data_for_db
+                self.control_data_for_db = control_data_for_db
                 self.max_a_diff = max_a
                 self.max_s_diff = max_s
                 self.max_y_diff = max_y
@@ -1474,8 +1482,8 @@ class MainApp:
                 name=name,
                 parameter_app=self.parameter_app,
                 numerical_app=self.numerical_app,
-                base_data=self.numerical_app.base_data,
-                control_data=self.numerical_app.control_data,
+                base_data=self.numerical_app.base_data_for_db,
+                control_data=self.numerical_app.control_data_for_db,
                 max_diffs=(
                     self.numerical_app.max_a_diff,
                     self.numerical_app.max_s_diff,

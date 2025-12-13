@@ -68,6 +68,10 @@ class MeinhardtSolver:
         self.base_data: GridData = []
         self.control_data: GridData = []
 
+        # Отдельные списки для сохранения в БД (прореженные при больших m)
+        self.base_data_for_db: GridData = []
+        self.control_data_for_db: GridData = []
+
         # Разница между сетками
         self.max_a_diff = 0.0
         self.max_s_diff = 0.0
@@ -97,6 +101,69 @@ class MeinhardtSolver:
                 "s": self.s2.copy(),
                 "y": self.y2.copy()
             })
+
+    def _save_to_db_lists(self, step: int):
+        """Сохраняет текущий слой в прореженные списки для БД (только при больших m)"""
+        if self.m1 <= 10000:
+            # Если m маленький — сохраняем всё в оба списка
+            self.base_data_for_db.append({
+                "layer": step,
+                "x": self.x1.copy(),
+                "a": self.a1.copy(),
+                "s": self.s1.copy(),
+                "y": self.y1.copy()
+            })
+            control_step = step * 4
+            if control_step <= self.m2:
+                self.control_data_for_db.append({
+                    "layer": control_step,
+                    "x": self.x2.copy(),
+                    "a": self.a2.copy(),
+                    "s": self.s2.copy(),
+                    "y": self.y2.copy()
+                })
+            return
+
+        # === Логика прореживания для больших m ===
+        total_steps = self.m1
+        TARGET_TOTAL = 5000
+        EARLY = min(1500, total_steps // 100)
+        LATE = EARLY
+        MIDDLE = max(0, TARGET_TOTAL - EARLY - LATE)
+
+        save_base = False
+
+        if step < EARLY:
+            save_base = True
+        elif step >= total_steps - LATE + 1:
+            save_base = True
+        elif MIDDLE > 0:
+            start_middle = EARLY
+            end_middle = total_steps - LATE
+            middle_length = end_middle - start_middle + 1
+            if middle_length > 0:
+                step_in_middle = (step - start_middle) % max(1, (middle_length + MIDDLE - 1) // MIDDLE)
+                if step_in_middle == 0:
+                    save_base = True
+
+        if save_base:
+            self.base_data_for_db.append({
+                "layer": step,
+                "x": self.x1.copy(),
+                "a": self.a1.copy(),
+                "s": self.s1.copy(),
+                "y": self.y1.copy()
+            })
+
+            control_step = step * 4
+            if control_step <= self.m2:
+                self.control_data_for_db.append({
+                    "layer": control_step,
+                    "x": self.x2.copy(),
+                    "a": self.a2.copy(),
+                    "s": self.s2.copy(),
+                    "y": self.y2.copy()
+                })
 
     def _update_control_diff(self, step: int):
         """Обновляет максимальную разницу между грубой и тонкой сеткой"""
@@ -147,6 +214,8 @@ class MeinhardtSolver:
                     "s": self.s2.copy(),
                     "y": self.y2.copy()
                 })
+
+            self._save_to_db_lists(step)
 
             # Прогресс
             if self.progress_callback:
@@ -258,6 +327,8 @@ class MeinhardtSolver:
         return (
             self.base_data,
             self.control_data,
+            self.base_data_for_db,    # прореженные — для БД
+            self.control_data_for_db, # прореженные — для БД
             self.max_a_diff,
             self.max_s_diff,
             self.max_y_diff

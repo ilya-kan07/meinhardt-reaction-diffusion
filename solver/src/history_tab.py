@@ -172,15 +172,40 @@ class HistoryTab:
             return []
 
         mode = self.display_mode.get()
+        total_saved = len(base_layers)
+
+        # Определяем, был ли расчёт прорежен (примерно: если слоёв меньше, чем m+1)
+        # Мы не знаем точное m, но если слоёв < 10001 — считаем, что не прорежен
+        is_thinned = total_saved < 10001
 
         if mode == "auto":
-            # 6 равномерно распределённых (включая первый и последний)
-            total = len(base_layers)
-            if total <= 6:
-                return base_layers
-            indices = [0] + [int(i * (total - 1) / 5) for i in range(1, 6)] + [total - 1]
-            indices = sorted(set(indices))  # на всякий случай убираем дубли
-            return [base_layers[i] for i in indices]
+            if not is_thinned:
+                # Маленький расчёт — все слои сохранены → равномерно по индексу
+                if total_saved <= 6:
+                    return base_layers
+                indices = [0] + [int(i * (total_saved - 1) / 5) for i in range(1, 6)] + [total_saved - 1]
+                indices = sorted(set(indices))
+                return [base_layers[i] for i in indices]
+            else:
+                # Большой расчёт — прорежен → выбираем 6 равномерно по времени
+                if total_saved <= 6:
+                    return base_layers
+
+                # Находим минимальное и максимальное время (layer)
+                min_t = base_layers[0]["layer"]
+                max_t = base_layers[-1]["layer"]
+
+                # 6 точек: 0%, 20%, 40%, 60%, 80%, 100%
+                target_times = [min_t + i * (max_t - min_t) / 5 for i in range(6)]
+
+                selected = []
+                for target in target_times:
+                    # Находим ближайший слой по времени
+                    closest = min(base_layers, key=lambda l: abs(l["layer"] - target))
+                    if closest not in selected:  # избегаем дубли (на концах)
+                        selected.append(closest)
+
+                return selected
 
         elif mode == "every":
             try:
@@ -194,11 +219,9 @@ class HistoryTab:
                 target = int(self.entry_var.get() or 0)
             except:
                 target = 0
-            # Ищем ближайший доступный слой
-            for layer in base_layers:
-                if layer["layer"] >= target:
-                    return [layer]
-            return [base_layers[-1]] if base_layers else []
+            # Ищем ближайший доступный слой по номеру
+            closest = min(base_layers, key=lambda l: abs(l["layer"] - target))
+            return [closest]
 
         return base_layers  # fallback
 
@@ -337,6 +360,7 @@ class HistoryTab:
         ma = c.get('max_a_diff', 0) or 0
         ms = c.get('max_s_diff', 0) or 0
         my = c.get('max_y_diff', 0) or 0
+
 
         err_data = [
             ("max |a − a*|", f"{ma:.8f}"),
