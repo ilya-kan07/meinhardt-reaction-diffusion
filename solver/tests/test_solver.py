@@ -67,7 +67,13 @@ def run_solver_with_preset(preset_name: str,
         b1=data["b_1"], b2=data["b_2"], b3=data["b_3"]
     )
 
-    base_data, control_data, max_a, max_s, max_y = solver.solve()
+    (
+        base_data,
+        control_data,
+        _base_db,            # прореженные — не нужны в тесте
+        _control_db,         # прореженные — не нужны в тесте
+        max_a, max_s, max_y
+    ) = solver.solve()
     return base_data[-1], (max_a, max_s, max_y)
 
 
