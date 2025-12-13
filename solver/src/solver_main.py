@@ -786,7 +786,7 @@ class NumericalSolutionApp:
 
     def create_layer_selector(self):
         self.layer_frame = ttk.LabelFrame(
-            self.left_frame, text="Режим отображения графиков")
+            self.left_frame, text="Режим отображения")
         self.layer_frame.pack(fill="x", pady=2)
 
         # Переменная режима
@@ -1192,7 +1192,7 @@ class NumericalSolutionApp:
         self.ax2.clear()
         self.ax3.clear()
 
-        colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'black']
+        colors = ['red', 'blue', 'green', 'orange', 'purple', 'black']
         mode = self.layer_mode.get()
         indices_to_plot = self.get_selected_layers()
 
@@ -1226,7 +1226,7 @@ class NumericalSolutionApp:
             self.ax3.plot(x_vals, y_vals,
                           label=f'Слой {layer}', color=colors[0])
         else:
-            for idx in indices_to_plot:
+            for plot_index, idx in enumerate(indices_to_plot):
                 layer_data = data[idx]
                 x_vals = layer_data["x"]
                 a_vals = layer_data["a"]
@@ -1234,12 +1234,11 @@ class NumericalSolutionApp:
                 y_vals = layer_data["y"]
                 layer = layer_data["layer"]
 
-                self.ax1.plot(
-                    x_vals, a_vals, label=f'Слой {layer}', color=colors[idx % len(colors)])
-                self.ax2.plot(
-                    x_vals, s_vals, label=f'Слой {layer}', color=colors[idx % len(colors)])
-                self.ax3.plot(
-                    x_vals, y_vals, label=f'Слой {layer}', color=colors[idx % len(colors)])
+                color = colors[plot_index]
+
+                self.ax1.plot(x_vals, a_vals, label=f'Слой {layer}', color=color)
+                self.ax2.plot(x_vals, s_vals, label=f'Слой {layer}', color=color)
+                self.ax3.plot(x_vals, y_vals, label=f'Слой {layer}', color=color)
 
         self.ax1.set_xlabel('x')
         self.ax1.set_ylabel('a(x, t)')
