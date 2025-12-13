@@ -976,6 +976,7 @@ class NumericalSolutionApp:
             return
         self.is_computing = True
         self.is_paused = False
+        self.start_time = time.time()
         self.current_step = 0
         self.base_data = []
         self.control_data = []
@@ -1147,6 +1148,12 @@ class NumericalSolutionApp:
                 self.max_y_diff_label.config(text=f"Max |y - y*|: {max_y:.4f}")
                 self.update_table()
                 self.plot_base_grid()
+
+                end_time = time.time()
+                elapsed_time = end_time - self.start_time
+                self.time_label.config(
+                    text=f"Время расчета: {elapsed_time:.2f} сек"
+                )
             self.main_frame.after(0, finalize)
 
         threading.Thread(target=run_solver, daemon=True).start()
