@@ -237,110 +237,124 @@ class HistoryTab:
         self.toggle_entry_state()
 
     def display_parameters(self):
-        # Очистка
+                # Очистка предыдущих виджетов
         for widget in self.params_frame.winfo_children():
             widget.destroy()
 
+        if not self.current_calc:
+            return
+
         c = self.current_calc
-
-        def fmt(val):
-            return f"{val:.6g}" if isinstance(val, (int, float)) else str(val)
-
-        # === 1. Начальные условия (самое важное — сверху!) ===
-                # === 1. Начальные условия — КОМПАКТНО, КРАСИВО, С НОРМАЛЬНЫМ ШРИФТОМ ===
-        init_f = ttk.LabelFrame(self.params_frame, text=" Начальные условия ", padding=(12, 8))
-        init_f.pack(fill=tk.X, pady=(0, 12))
-
         i = c['initial']
+        s = c['system']
+        g = c['grid']
 
-        # Заголовки a | s | y
-        header = ttk.Frame(init_f)
-        header.pack(fill=tk.X, pady=(4, 6))
-        tk.Label(header, text="      ", width=5).pack(side=tk.LEFT)
-        for title in ["a", "s", "y"]:
-            tk.Label(header, text=title, font=("Consolas", 11, "bold"),
-                     width=14, anchor="center").pack(side=tk.LEFT, padx=0)
+        # === Один большой модуль "Параметры расчёта" ===
+        main_frame = ttk.LabelFrame(self.params_frame, text=" Параметры расчёта ", padding=15)
+        main_frame.pack(fill=tk.X, pady=(0, 12))
 
-        # A₀ – A₃ — плотные строки, без лишних pady
-        coeffs = [("A₀", i['a0']), ("A₁", i['a1']), ("A₂", i['a2']), ("A₃", i['a3'])]
-        for name, arr in coeffs:
-            row = ttk.Frame(init_f)
-            row.pack(fill=tk.X, pady=1)  # минимальный отступ между строками
-            tk.Label(row, text=f"{name}:", font=("Consolas", 11), width=5).pack(side=tk.LEFT)
-            for val in arr:
-                tk.Label(row, text=f"{fmt(val):>13}", font=("Consolas", 11),
-                         width=12, anchor="center").pack(side=tk.LEFT, padx=0)
+        # Вспомогательная функция для подзаголовков
+        def add_section_title(parent, title):
+            lbl = ttk.Label(parent, text=title, font=("Arial", 11, "bold"), foreground="#2c3e50")
+            lbl.pack(anchor="w", pady=(10, 6))
 
-        # b₁ b₂ b₃ — снизу, аккуратно и по центру
-        b_frame = ttk.Frame(init_f)
-        b_frame.pack(fill=tk.X, pady=(8, 4))
-        b1, b2, b3 = i['b']
-        tk.Label(b_frame, text=f"b₁ = {b1}  b₂ = {b2}  b₃ = {b3}",
-                 font=("Consolas", 11,)).pack(anchor="center")
+        # Вспомогательная функция для таблицы
+        def create_table(parent, columns_dict, data, widths=None, height=4):
+            col_names = list(columns_dict.keys())
+            col_headers = list(columns_dict.values())
+
+            tree_frame = ttk.Frame(parent)
+            tree_frame.pack(fill=tk.X, pady=(0, 10))
+
+            tree = ttk.Treeview(tree_frame, columns=col_names, show="headings", height=height)
+            for col, header in zip(col_names, col_headers):
+                tree.heading(col, text=header)
+                w = widths.get(col, 100) if widths else 100
+                tree.column(col, width=w, anchor="center")
+
+            for row in data:
+                tree.insert("", "end", values=row)
+
+            tree.pack(fill=tk.X)
+            return tree
+
+        # === 1. Начальные условия ===
+        add_section_title(main_frame, "Начальные условия")
+
+        cols_init = {"coeff": "Коэффициент", "a": "a", "s": "s", "y": "y"}
+        widths_init = {"coeff": 100, "a": 120, "s": 120, "y": 120}
+
+        init_data = [
+            ("A₀", f"{i['a0'][0]:.6g}", f"{i['a0'][1]:.6g}", f"{i['a0'][2]:.6g}"),
+            ("A₁", f"{i['a1'][0]:.6g}", f"{i['a1'][1]:.6g}", f"{i['a1'][2]:.6g}"),
+            ("A₂", f"{i['a2'][0]:.6g}", f"{i['a2'][1]:.6g}", f"{i['a2'][2]:.6g}"),
+            ("A₃", f"{i['a3'][0]:.6g}", f"{i['a3'][1]:.6g}", f"{i['a3'][2]:.6g}"),
+            ("b₁ / b₂ / b₃", i['b'][0], i['b'][1], i['b'][2]),
+        ]
+
+        create_table(main_frame, cols_init, init_data, widths_init, height=5)
 
         # === 2. Параметры сетки ===
-        grid_f = ttk.LabelFrame(self.params_frame, text=" Параметры сетки ", padding=10)
-        grid_f.pack(fill=tk.X, pady=(0, 12))
-        tk.Label(grid_f, text=f"n (узлов): {c['grid']['n']}", font=(
-            "Consolas", 11)).pack(anchor="w")
-        tk.Label(grid_f, text=f"m (шагов): {c['grid']['m']}", font=(
-            "Consolas", 11)).pack(anchor="w")
-        tk.Label(grid_f, text=f"T = {fmt(c['grid']['T'])}", font=(
-            "Consolas", 11)).pack(anchor="w")
+        add_section_title(main_frame, "Параметры сетки")
 
-        # === 3. Системные параметры ===
-        sys_f = ttk.LabelFrame(
-            self.params_frame, text=" Параметры системы ", padding=10)
-        sys_f.pack(fill=tk.X, pady=(0, 12))
-
-        s = c['system']
-
-        # Две колонки
-        cols_frame = ttk.Frame(sys_f)
-        cols_frame.pack(fill=tk.X)
-
-        left_col = ttk.Frame(cols_frame)
-        right_col = ttk.Frame(cols_frame)
-        left_col.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        right_col.pack(side=tk.RIGHT, fill=tk.X, expand=True)
-
-        left_items = [
-            ("c   ", s['c']),
-            ("μ   ", s['mu']),
-            ("c₀  ", s['c0']),
-            ("ν   ", s['nu']),
-            ("ε   ", s['eps']),
-            ("η   ", s['eta']),
+        grid_data = [
+            ("n (сетка по x):", g['n']),
+            ("m (сетка по t):", g['m']),
+            ("T (время)", f"{g['T']:.6g}"),
         ]
-        right_items = [
-            ("d   ", s['d']),
-            ("e   ", s['e']),
-            ("f   ", s['f']),
-            ("Dₐ  ", s['Da']),
-            ("Dₛ  ", s['Ds']),
-            ("Dᵧ  ", s['Dy']),
-        ]
+        create_table(main_frame,
+                     {"param": "Параметр", "value": "Значение"},
+                     grid_data,
+                     {"param": 180, "value": 150},
+                     height=3)
 
-        for name, val in left_items:
-            tk.Label(left_col, text=f"{name} = {fmt(val)}", font=(
-                "Consolas", 11), anchor="w").pack(anchor="w", pady=1)
-        for name, val in right_items:
-            tk.Label(right_col, text=f"{name} = {fmt(val)}", font=(
-                "Consolas", 11), anchor="w").pack(anchor="w", pady=1)
+        # === 3. Параметры системы — три колонки ===
+        add_section_title(main_frame, "Параметры системы")
 
-        # === 4. Погрешность ===
-        err_f = ttk.LabelFrame(
-            self.params_frame, text=" Максимальные разности ", padding=10)
-        err_f.pack(fill=tk.X, pady=(0, 0))
+        sys_inner_frame = ttk.Frame(main_frame)
+        sys_inner_frame.pack(fill=tk.X, pady=(0, 10))
+
+        col1 = ttk.Frame(sys_inner_frame)
+        col2 = ttk.Frame(sys_inner_frame)
+        col3 = ttk.Frame(sys_inner_frame)
+        col1.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 25))
+        col2.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 25))
+        col3.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        col1_data = [("c", s['c']), ("μ", s['mu']), ("c₀", s['c0']), ("ν", s['nu'])]
+        col2_data = [("ε", s['eps']), ("d", s['d']), ("e", s['e']), ("f", s['f'])]
+        col3_data = [("η", s['eta']), ("Dₐ", s['Da']), ("Dₛ", s['Ds']), ("Dᵧ", s['Dy'])]
+
+        def make_column(frame, data):
+            for name, val in data:
+                row = ttk.Frame(frame)
+                row.pack(fill=tk.X, pady=2)
+                ttk.Label(row, text=f"{name}", width=8, font=("Consolas", 11, "bold"), anchor="e").pack(side=tk.LEFT)
+                ttk.Label(row, text=f" = {val:.6g}", font=("Consolas", 11)).pack(side=tk.LEFT)
+
+        make_column(col1, col1_data)
+        make_column(col2, col2_data)
+        make_column(col3, col3_data)
+
+        # === Максимальные разности — отдельно ===
+        err_frame = ttk.LabelFrame(self.params_frame, text=" Максимальные разности ", padding=10)
+        err_frame.pack(fill=tk.X, pady=(0, 0))
+
         ma = c.get('max_a_diff', 0) or 0
         ms = c.get('max_s_diff', 0) or 0
         my = c.get('max_y_diff', 0) or 0
-        tk.Label(err_f, text=f"max|a-a*| = {ma:.6f}", font=(
-            "Consolas", 11)).pack(anchor="w")
-        tk.Label(err_f, text=f"max|s-s*| = {ms:.6f}", font=(
-            "Consolas", 11)).pack(anchor="w")
-        tk.Label(err_f, text=f"max|y-y*| = {my:.6f}", font=(
-            "Consolas", 11)).pack(anchor="w")
+
+        err_data = [
+            ("max |a − a*|", f"{ma:.6f}"),
+            ("max |s − s*|", f"{ms:.6f}"),
+            ("max |y − y*|", f"{my:.6f}"),
+        ]
+
+        create_table(err_frame,
+                     {"error": "Разность", "value": "Значение"},
+                     err_data,
+                     {"error": 180, "value": 150},
+                     height=3)
 
     def update_layer_list(self):
         base_layers = [l for l in self.current_calc["layers"] if not l["is_control"]]
