@@ -19,49 +19,72 @@ class HistoryTab:
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(10, 5), pady=10)
 
         # Список расчётов — уменьшаем ширину
-        ttk.Label(left_frame, text="Сохранённые расчёты:", font=(
-            "Arial", 12, "bold")).pack(anchor="w", pady=(0, 8))
+        header_frame = ttk.Frame(left_frame)
+        header_frame.pack(fill=tk.X, pady=(0, 8))
 
+        ttk.Label(header_frame, text="Сохранённые расчёты:", font=("Arial", 12, "bold")).pack(side=tk.LEFT)
+
+        # Кнопки справа
+        btns = ttk.Frame(header_frame)
+        btns.pack(side=tk.RIGHT)
+        ttk.Button(btns, text="Обновить", command=self.refresh_list).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btns, text="Удалить", command=self.delete_selected, style="Danger.TButton").pack(side=tk.LEFT)
+
+        # Список расчётов — уменьшаем высоту с 10 до 6–7 строк
         columns = ("id", "name", "date", "note")
         self.tree = ttk.Treeview(
-            left_frame, columns=columns, show="headings", height=10)
+            left_frame, columns=columns, show="headings", height=7)  # было 10 → стало 7
         self.tree.heading("id", text="ID")
         self.tree.heading("name", text="Название")
         self.tree.heading("date", text="Дата")
         self.tree.heading("note", text="Заметка")
 
         self.tree.column("id", width=50, anchor="center")
-        self.tree.column("name", width=180)   # было 200
-        self.tree.column("date", width=110)   # было 130
-        self.tree.column("note", width=180)   # было 220
+        self.tree.column("name", width=180)
+        self.tree.column("date", width=110)
+        self.tree.column("note", width=180)
 
         self.tree.pack(fill=tk.X, pady=(0, 10))
         self.tree.bind("<<TreeviewSelect>>", self.on_select)
+        self.tree.bind("<<TreeviewSelect>>", self.on_select)
 
-        # Кнопки
-        btns = ttk.Frame(left_frame)
-        btns.pack(fill=tk.X, pady=(0, 10))
-        ttk.Button(btns, text="Обновить",
-                   command=self.refresh_list).pack(side=tk.LEFT)
-        ttk.Button(btns, text="Удалить", command=self.delete_selected,
-                   style="Danger.TButton").pack(side=tk.RIGHT)
+        # === Блок "Отображение слоёв" — теперь в левой панели ===
+        display_frame = ttk.LabelFrame(left_frame, text=" Отображение слоёв ", padding=10)
+        display_frame.pack(fill=tk.X, pady=(10, 0))
 
-        # === Прокручиваемая область для параметров ===
-        canvas = tk.Canvas(left_frame, width=420)  # фиксированная ширина
-        scrollbar = ttk.Scrollbar(
-            left_frame, orient="vertical", command=canvas.yview)
-        self.params_frame = ttk.Frame(canvas)
+        self.display_mode = tk.StringVar(value="auto")
 
-        self.params_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
+        modes = [
+            ("auto", "Авто"),
+            ("every", "Каждый N-й"),
+            ("single", "Один слой")
+        ]
+        for i, (mode, text) in enumerate(modes):
+            ttk.Radiobutton(display_frame, text=text, variable=self.display_mode,
+                            value=mode, command=self.on_display_mode_change).grid(row=0, column=i, padx=10, sticky="w")
 
-        canvas.create_window((0, 0), window=self.params_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        # Поле ввода
+        self.entry_var = tk.StringVar(value="10")
+        self.entry_n = ttk.Entry(display_frame, textvariable=self.entry_var, width=8, font=("Consolas", 11))
+        self.entry_n.grid(row=0, column=3, padx=(30, 5))
 
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # Кнопка "Показать"
+        show_btn = ttk.Button(display_frame, text="Показать", command=self.on_show_button)
+        show_btn.grid(row=0, column=4, padx=(0, 10))
+
+        # Автообновление при Enter или потере фокуса
+        self.entry_n.bind("<Return>", lambda e: self.on_show_button())
+        self.entry_n.bind("<FocusOut>", lambda e: self.on_show_button())
+
+        # Изначально поле выключено (активируется в toggle_entry_state)
+        self.entry_n.config(state="disabled")
+
+        # Привязываем смену режима для активации/деактивации поля
+        self.display_mode.trace("w", self.toggle_entry_state)
+
+        # === Область для параметров расчёта — без прокрутки, растягивается по высоте ===
+        self.params_frame = ttk.Frame(left_frame)
+        self.params_frame.pack(fill=tk.BOTH, expand=True, pady=(20, 10))
 
         # Правая панель (графики и таблица)
         self.setup_right_panel()
@@ -70,35 +93,6 @@ class HistoryTab:
         right_frame = ttk.Frame(self.frame)
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH,
                          expand=True, padx=(5, 10), pady=10)
-
-        control_frame = ttk.LabelFrame(right_frame, text=" Отображение слоёв ", padding=10)
-        control_frame.pack(fill=tk.X, pady=(0, 10))
-
-        self.display_mode = tk.StringVar(value="auto")
-
-        modes = [
-            ("auto", "Авто (6 равномерно)"),
-            ("every", "Каждый N-й"),
-            ("single", "Один слой")
-        ]
-        for i, (mode, text) in enumerate(modes):
-            ttk.Radiobutton(control_frame, text=text, variable=self.display_mode,
-                            value=mode, command=self.on_display_mode_change).grid(row=0, column=i, padx=15, sticky="w")
-
-        # Поле ввода
-        self.entry_var = tk.StringVar(value="10")
-        self.entry_n = ttk.Entry(control_frame, textvariable=self.entry_var, width=12, font=("Consolas", 11))
-        self.entry_n.grid(row=0, column=3, padx=(30, 5))
-
-        # КНОПКА "Показать" — вот она!
-        show_btn = ttk.Button(control_frame, text="Показать", command=self.on_show_button)
-        show_btn.grid(row=0, column=4, padx=(0, 10))
-
-        # Автообновление при нажатии Enter в поле
-        self.entry_n.bind("<Return>", lambda e: self.on_show_button())
-        self.entry_n.bind("<FocusOut>", lambda e: self.on_show_button())  # при потере фокуса
-
-        # По умолчанию поле выключено
 
         # === Три графика в ряд ===
         plot_frame = ttk.Frame(right_frame)
@@ -251,12 +245,12 @@ class HistoryTab:
 
         # === Один большой модуль "Параметры расчёта" ===
         main_frame = ttk.LabelFrame(self.params_frame, text=" Параметры расчёта ", padding=15)
-        main_frame.pack(fill=tk.X, pady=(0, 12))
+        main_frame.pack(fill=tk.X, pady=(0, 8))
 
         # Вспомогательная функция для подзаголовков
         def add_section_title(parent, title):
             lbl = ttk.Label(parent, text=title, font=("Arial", 11, "bold"), foreground="#2c3e50")
-            lbl.pack(anchor="w", pady=(10, 6))
+            lbl.pack(anchor="w", pady=(8, 4))
 
         # Вспомогательная функция для таблицы
         def create_table(parent, columns_dict, data, widths=None, height=4):
@@ -264,7 +258,7 @@ class HistoryTab:
             col_headers = list(columns_dict.values())
 
             tree_frame = ttk.Frame(parent)
-            tree_frame.pack(fill=tk.X, pady=(0, 10))
+            tree_frame.pack(fill=tk.X, pady=(0, 6))
 
             tree = ttk.Treeview(tree_frame, columns=col_names, show="headings", height=height)
             for col, header in zip(col_names, col_headers):
@@ -464,7 +458,7 @@ class HistoryTab:
 
             for i in range(len(x_base)):
                 self.table.insert("", "end", values=(
-                    t_base,
+                    f"{t_base}/{t_base * 4}",
                     f"{x_base[i]:.6f}",
                     f"{val_base[i]:.6f}",
                     f"{val_control[i]:.6f}",
