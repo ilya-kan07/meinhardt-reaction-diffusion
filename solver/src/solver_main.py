@@ -798,19 +798,18 @@ class NumericalSolutionApp:
             textvariable=self.layer_mode,
             values=("Последний слой", "Несколько слоёв", "Выбрать слой"),
             state="readonly",
-            width=20
         )
-        self.mode_selector.pack(padx=5, pady=5, anchor="w")
+        self.mode_selector.pack(padx=5, pady=5, anchor="w", fill="x")
         self.mode_selector.bind("<<ComboboxSelected>>", self.on_layer_mode_change)
 
         # Фрейм для выбора конкретного слоя (изначально скрыт)
         self.single_layer_frame = ttk.Frame(self.layer_frame)
 
         ttk.Label(self.single_layer_frame, text="Слой:").pack(side="left", padx=(5, 2))
-        self.layer_combobox = ttk.Combobox(
-            self.single_layer_frame, state="readonly", width=10)
-        self.layer_combobox.pack(side="left", padx=2)
-        self.layer_combobox.bind("<<ComboboxSelected>>", lambda e: self.update_plots())
+        self.layer_entry = ttk.Entry(self.single_layer_frame, width=12)
+        self.layer_entry.pack(side="left", padx=2)
+        self.layer_entry.bind('<Return>', lambda e: self.update_plots())  # Enter → обновить
+        self.layer_entry.bind('<FocusOut>', lambda e: self.update_plots())  # на всякий случай
 
     def on_layer_mode_change(self, event=None):
         mode = self.layer_mode.get()
@@ -818,9 +817,11 @@ class NumericalSolutionApp:
         # Скрываем/показываем выбор конкретного слоя
         if mode == "Выбрать слой":
             self.single_layer_frame.pack(fill="x", padx=5, pady=2)
-            self.update_layer_list()  # заполняем список доступных слоёв
+            self.layer_entry.focus_set()
+            self.layer_entry.delete(0, tk.END)
         else:
             self.single_layer_frame.pack_forget()
+            self.layer_entry.delete(0, tk.END)
 
         # Если данных ещё нет — не падаем
         if not self.base_data:
@@ -840,51 +841,48 @@ class NumericalSolutionApp:
             self.layer_combobox.current(len(layers) - 1)  # по умолчанию последний
 
     def get_selected_layers(self):
-        """Возвращает список индексов слоёв, которые нужно отобразить"""
+        """Возвращает список индексов слоёв (в base_data), которые нужно отобразить"""
         if not self.base_data:
             return []
 
         mode = self.layer_mode.get()
+        total_layers = len(self.base_data)
 
         if mode == "Последний слой":
-            return [len(self.base_data) - 1]                     # только последний
+            return [total_layers - 1]
 
         elif mode == "Несколько слоёв":
-            total = len(self.base_data)
-            if total <= 1:
-                return list(range(total))
-            # Равномерно 6 точек (включая 0 и последний)
+            if total_layers <= 1:
+                return list(range(total_layers))
             indices = [0]
             for i in range(1, 5):
-                indices.append(int(i * (total - 1) / 5))
-            indices.append(total - 1)
-            return sorted(set(indices))  # на всякий случай убираем дубли
+                indices.append(int(i * (total_layers - 1) / 5))
+            indices.append(total_layers - 1)
+            return sorted(set(indices))
 
         elif mode == "Выбрать слой":
+            text = self.layer_entry.get().strip()
+            if not text:  # Если поле пустое — ничего не ругаемся, просто показываем последний слой
+                return [total_layers - 1]
+
             try:
-                selected = self.layer_combobox.current()
-                if selected >= 0:
-                    return [selected]
-            except:
-                pass
-            return [len(self.base_data) - 1]  # fallback
+                layer_num = int(text)
+                if 0 <= layer_num < total_layers:
+                    return [layer_num]
+                else:
+                    messagebox.showwarning(
+                        "Неверный слой",
+                        f"Допустимые значения: 0 – {total_layers - 1}"
+                    )
+                    self.layer_entry.delete(0, tk.END)
+                    return [total_layers - 1]
+            except ValueError:
+                messagebox.showwarning("Ошибка ввода", "Введите целое число")
+                self.layer_entry.delete(0, tk.END)
+                return [total_layers - 1]
 
-        return [len(self.base_data) - 1]
+        return [total_layers - 1]
 
-    def on_layer_mode_change(self, event):
-        if self.layer_mode.get() == "Несколько слоев" and (self.is_computing or self.is_paused):
-            messagebox.showwarning(
-                "Предупреждение", "Режим 'Несколько слоев' доступен только после полного завершения расчета!")
-            self.layer_mode.set("Последний слой")
-            self.layer_selector.set("Последний слой")
-        self.update_table()
-        if hasattr(self, 'last_plotted_grid'):
-            if self.last_plotted_grid == "base":
-                self.plot_base_grid()
-            elif self.last_plotted_grid == "control":
-                self.plot_control_grid()
-        else:
-            self.plot_base_grid()
 
     def switch_table(self):
         self.a_tree.pack_forget()
@@ -1147,20 +1145,40 @@ class NumericalSolutionApp:
                 self.max_a_diff_label.config(text=f"Max |a - a*|: {max_a:.4f}")
                 self.max_s_diff_label.config(text=f"Max |s - s*|: {max_s:.4f}")
                 self.max_y_diff_label.config(text=f"Max |y - y*|: {max_y:.4f}")
-                self.update_layer_list()
                 self.update_table()
                 self.plot_base_grid()
             self.main_frame.after(0, finalize)
 
         threading.Thread(target=run_solver, daemon=True).start()
 
+    def update_plots(self):
+        """Обновляет графики и таблицу в зависимости от текущего выбранного графика (base/control)"""
+        if not self.base_data:
+            return
+
+        # Определяем, какой график был показан последним
+        if hasattr(self, 'last_plotted_grid'):
+            if self.last_plotted_grid == "base":
+                self.plot_base_grid()
+            elif self.last_plotted_grid == "control":
+                self.plot_control_grid()
+            else:
+                self.plot_base_grid()  # fallback
+        else:
+            self.plot_base_grid()  # если ещё ничего не plotting, показываем базовую
+
+        # Обновляем таблицу (она показывает данные того же слоя/слоёв, что и график)
+        self.update_table()
+
     def plot_base_grid(self):
         self.last_plotted_grid = "base"
         self.plot_grid(self.base_data, "Базовая сетка")
+        self.update_table()
 
     def plot_control_grid(self):
         self.last_plotted_grid = "control"
         self.plot_grid(self.control_data, "Контрольная сетка")
+        self.update_table()
 
     def plot_grid(self, data, title_prefix):
         if not data:
@@ -1489,6 +1507,7 @@ class MainApp:
 
 def main():
     root = tk.Tk()
+    root.state('zoomed')
     app = MainApp(root)
     root.mainloop()
 
