@@ -339,9 +339,9 @@ class HistoryTab:
         my = c.get('max_y_diff', 0) or 0
 
         err_data = [
-            ("max |a − a*|", f"{ma:.6f}"),
-            ("max |s − s*|", f"{ms:.6f}"),
-            ("max |y − y*|", f"{my:.6f}"),
+            ("max |a − a*|", f"{ma:.8f}"),
+            ("max |s − s*|", f"{ms:.8f}"),
+            ("max |y − y*|", f"{my:.8f}"),
         ]
 
         create_table(err_frame,
@@ -371,6 +371,9 @@ class HistoryTab:
             return
 
         colors = ['red', 'orange', 'green', 'blue', 'purple', 'black']
+        colors = ['red', 'blue', 'green', 'orange', 'purple', 'black']
+
+        mode = self.display_mode.get()
 
         # Очистка графиков
         for ax in self.axes:
@@ -381,13 +384,19 @@ class HistoryTab:
             x = layer["x"]
             a, s, y = layer["a"], layer["s"], layer["y"]
             t = layer["layer"]
-            color = colors[idx % len(colors)]
             lw = 1.6
             label = f"t = {t}"
 
-            self.axes[0].plot(x, a, color=color, linewidth=lw, label=label)
-            self.axes[1].plot(x, s, color=color, linewidth=lw, label=label)
-            self.axes[2].plot(x, y, color=color, linewidth=lw, label=label)
+            if mode == "single":
+                self.axes[0].plot(x, a, color="blue", linewidth=lw, label=label)
+                self.axes[1].plot(x, s, color="green", linewidth=lw, label=label)
+                self.axes[2].plot(x, y, color="red", linewidth=lw, label=label)
+            else:
+                colors = ['red', 'blue', 'green', 'orange', 'purple', 'black']
+                color = colors[idx % len(colors)]
+                self.axes[0].plot(x, a, color=color, linewidth=lw, label=label)
+                self.axes[1].plot(x, s, color=color, linewidth=lw, label=label)
+                self.axes[2].plot(x, y, color=color, linewidth=lw, label=label)
 
         # Оформление графиков
         titles = ["a(x,t)", "s(x,t)", "y(x,t)"]

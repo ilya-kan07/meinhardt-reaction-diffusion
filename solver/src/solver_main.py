@@ -1143,9 +1143,9 @@ class NumericalSolutionApp:
                 self.is_paused = False
                 self.update_button_states()
                 self.show_completion_notification("Расчёт завершён")
-                self.max_a_diff_label.config(text=f"Max |a - a*|: {max_a:.4f}")
-                self.max_s_diff_label.config(text=f"Max |s - s*|: {max_s:.4f}")
-                self.max_y_diff_label.config(text=f"Max |y - y*|: {max_y:.4f}")
+                self.max_a_diff_label.config(text=f"Max |a - a*|: {max_a:.8f}")
+                self.max_s_diff_label.config(text=f"Max |s - s*|: {max_s:.8f}")
+                self.max_y_diff_label.config(text=f"Max |y - y*|: {max_y:.8f}")
                 self.update_table()
                 self.plot_base_grid()
 
