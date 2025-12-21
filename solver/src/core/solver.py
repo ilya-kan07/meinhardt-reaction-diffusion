@@ -59,7 +59,7 @@ class MeinhardtSolver:
                    a2[0]*np.cos(b2*np.pi*self.x2) + a3[0]*np.cos(b3*np.pi*self.x2))
         self.s2 = (a0[1] + a1[1]*np.cos(b1*np.pi*self.x2) +
                    a2[1]*np.cos(b2*np.pi*self.x2) + a3[1]*np.cos(b3*np.pi*self.x2))
-        self.y2 = (a0[2] + a1[2]*np.cos(b2*np.pi*self.x2) +
+        self.y2 = (a0[2] + a1[2]*np.cos(b1*np.pi*self.x2) +
                    a2[2]*np.cos(b2*np.pi*self.x2) + a3[2]*np.cos(b3*np.pi*self.x2))
 
         self.progress_callback = progress_callback
