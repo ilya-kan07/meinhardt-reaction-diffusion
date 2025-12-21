@@ -1,2 +1,4 @@
 numpy>=1.26.0
 matplotlib>=3.8.0
+Pillow>=10.0.0
+blosc2>=3.0.0

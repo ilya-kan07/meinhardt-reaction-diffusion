@@ -5,10 +5,19 @@ from io import BytesIO
 from typing import List, Dict, Any, Optional, Tuple
 import os
 import blosc2
+import sys
 
-# Путь к базе данных — в корне проекта
-DB_PATH = Path(__file__).parent.parent.parent / "meinhardt_results.db"
+# Определяем, запущены ли мы из PyInstaller-бандла
+IS_BUNDLED = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 
+if IS_BUNDLED:
+    # sys.executable — путь к самому exe-файлу
+    DB_DIR = Path(sys.executable).parent
+else:
+    # В разработке — корень проекта (на уровень выше solver/)
+    DB_DIR = Path(__file__).resolve().parent.parent.parent
+
+DB_PATH = DB_DIR / "meinhardt_results.db"
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH)

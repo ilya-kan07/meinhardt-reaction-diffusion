@@ -36,7 +36,6 @@ Thumbs.db
 # PyInstaller
 build/
 dist/
-*.spec
 
 # === ТОЛЬКО РЕЗУЛЬТАТЫ РАСЧЁТОВ ===
 results/
