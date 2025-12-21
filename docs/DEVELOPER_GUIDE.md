@@ -15,6 +15,9 @@
     |   |   ├── utils/
     |   |   |   ├── parameter_reader.py         # Чтение параметров из файла
     |   |   |   └── paths.py                    # Пути для сохранения и чтения данных
+    |   |   ├── database/
+    |   |   |   ├── database.py                 # Работа с SQLite базой
+    |   |   |   └── history_tab.py              # реализация вкладки "История"
     │   │   └── solver_main.py                  # GUI + основная логика
     │   └── tests/                              # Unit-тесты
     │       ├── test_initial_conditions.py      # Проверка начальных условий
@@ -109,3 +112,4 @@
     git commit -m "docs: add detailed file descriptions to developer guide"
     git push
 ```
+
