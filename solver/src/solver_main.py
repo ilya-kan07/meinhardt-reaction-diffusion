@@ -97,9 +97,9 @@ class ParameterApp:
         header_frame = ttk.Frame(params_frame)
         header_frame.pack(fill="x", pady=(5, 2))
         ttk.Label(header_frame, text="", width=10).pack(side="left")
-        ttk.Label(header_frame, text="a", width=8).pack(side="left", padx=2)
-        ttk.Label(header_frame, text="s", width=8).pack(side="left", padx=2)
-        ttk.Label(header_frame, text="y", width=8).pack(side="left", padx=2)
+        ttk.Label(header_frame, text="aᵢ", width=8).pack(side="left", padx=2)
+        ttk.Label(header_frame, text="sᵢ", width=8).pack(side="left", padx=2)
+        ttk.Label(header_frame, text="yᵢ", width=8).pack(side="left", padx=2)
         ttk.Label(header_frame, text="", width=10).pack(side="left")
 
         a0_frame = ttk.Frame(params_frame)
@@ -145,12 +145,12 @@ class ParameterApp:
             self.entries[param] = entry
             entry.bind('<KeyRelease>', lambda e: self.update_time_constraint())
 
+        self.tau_display_label = ttk.Label(
+            grid_frame, text="Шаг по времени tau = T/m: ещё не задано", foreground="blue")
+        self.tau_display_label.pack(pady=5)
         self.time_constraint_label = ttk.Label(
             grid_frame, text="Ограничение tau < h²/(2*max(D_a, D_s, D_y)): ещё не задано")
         self.time_constraint_label.pack(pady=5)
-        self.tau_display_label = ttk.Label(
-            grid_frame, text="Текущий tau: ещё не задано", foreground="blue")
-        self.tau_display_label.pack(pady=5)
 
     def save_initial_conditions_plot(self, save_dir):
         if not self.initial_conditions:
@@ -241,11 +241,11 @@ class ParameterApp:
 
     def update_time_constraint(self, event=None):
         if not self.validate_parameters():
-            self.time_constraint_label.config(
-                text="Ограничение tau < h²/(2*max(D_a, D_s, D_y)): введите корректные значения", foreground="red"
-            )
             self.tau_display_label.config(
                 text="Текущий tau: введите корректные значения", foreground="blue"
+            )
+            self.time_constraint_label.config(
+                text="Ограничение tau < h²/(2*max(D_a, D_s, D_y)): введите корректные значения", foreground="red"
             )
             return
 
@@ -271,11 +271,11 @@ class ParameterApp:
             max_tau = h**2 / (2 * max_D)
             current_tau = T / m
 
+            self.tau_display_label.config(
+                text=f"Шаг по времени tau = T/m: {current_tau:.6f}", foreground="blue"
+            )
             self.time_constraint_label.config(
                 text=f"Ограничение: tau < {max_tau:.6f}"
-            )
-            self.tau_display_label.config(
-                text=f"Текущий tau = {current_tau:.6f}", foreground="blue"
             )
 
             if current_tau < max_tau:
@@ -293,7 +293,7 @@ class ParameterApp:
             )
 
     def create_axis_limits_inputs(self):
-        limits_frame = ttk.LabelFrame(self.left_frame, text="Пределы осей Y")
+        limits_frame = ttk.LabelFrame(self.left_frame, text="Масштаб графиков по вертикали")
         limits_frame.pack(fill="x", pady=10)
 
         for func, defaults in [

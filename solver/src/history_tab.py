@@ -55,7 +55,7 @@ class HistoryTab:
         self.display_mode = tk.StringVar(value="auto")
 
         modes = [
-            ("auto", "Авто"),
+            ("auto", "Несколько слоёв"),
             ("every", "Каждый N-й"),
             ("single", "Один слой")
         ]
@@ -298,18 +298,38 @@ class HistoryTab:
         # === 1. Начальные условия ===
         add_section_title(main_frame, "Начальные условия")
 
-        cols_init = {"coeff": "Коэффициент", "a": "a", "s": "s", "y": "y"}
-        widths_init = {"coeff": 100, "a": 120, "s": 120, "y": 120}
+        init_container = ttk.Frame(main_frame)
+        init_container.pack(fill=tk.X, pady=(0, 6))
+
+        cols_init = {"coeff": "", "a": "aᵢ", "s": "sᵢ", "y": "yᵢ"}
+        widths_init = {"coeff": 70, "a": 90, "s": 90, "y": 90}
 
         init_data = [
             ("A₀", f"{i['a0'][0]:.6g}", f"{i['a0'][1]:.6g}", f"{i['a0'][2]:.6g}"),
             ("A₁", f"{i['a1'][0]:.6g}", f"{i['a1'][1]:.6g}", f"{i['a1'][2]:.6g}"),
             ("A₂", f"{i['a2'][0]:.6g}", f"{i['a2'][1]:.6g}", f"{i['a2'][2]:.6g}"),
             ("A₃", f"{i['a3'][0]:.6g}", f"{i['a3'][1]:.6g}", f"{i['a3'][2]:.6g}"),
-            ("b₁ / b₂ / b₃", i['b'][0], i['b'][1], i['b'][2]),
         ]
 
-        create_table(main_frame, cols_init, init_data, widths_init, height=5)
+        left_frame = ttk.Frame(init_container)
+        left_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        create_table(left_frame, cols_init, init_data, widths_init, height=4)
+
+        # ---- маленькая таблица b ----
+        b_cols = {"coef": "b", "value": "Значение"}
+        b_widths = {"coef": 60, "value": 80}
+
+        b_data = [
+            ("b₁", i['b'][0]),
+            ("b₂", i['b'][1]),
+            ("b₃", i['b'][2]),
+        ]
+
+        right_frame = ttk.Frame(init_container)
+        right_frame.pack(side=tk.LEFT, padx=(10, 0))
+
+        create_table(right_frame, b_cols, b_data, b_widths, height=3)
 
         # === 2. Параметры сетки ===
         add_section_title(main_frame, "Параметры сетки")
@@ -354,7 +374,7 @@ class HistoryTab:
         make_column(col3, col3_data)
 
         # === Максимальные разности — отдельно ===
-        err_frame = ttk.LabelFrame(self.params_frame, text=" Максимальные разности ", padding=10)
+        err_frame = ttk.LabelFrame(self.params_frame, text=" Максимальные разности по всей сетке", padding=10)
         err_frame.pack(fill=tk.X, pady=(0, 0))
 
         ma = c.get('max_a_diff', 0) or 0
