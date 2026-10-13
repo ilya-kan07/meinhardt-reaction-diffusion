@@ -7,9 +7,12 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from solver.src.database import get_calculation_list, load_calculation, delete_calculation
 
 class HistoryTab:
-    def __init__(self, notebook):
+    def __init__(self, notebook, parameter_app, numerical_app):
         self.frame = ttk.Frame(notebook)
         notebook.add(self.frame, text="История")
+
+        self.parameter_app = parameter_app
+        self.numerical_app = numerical_app
         self.current_calc = None
         self.setup_ui()
 
@@ -33,7 +36,7 @@ class HistoryTab:
         # Список расчётов — уменьшаем высоту с 10 до 6–7 строк
         columns = ("id", "name", "date", "note")
         self.tree = ttk.Treeview(
-            left_frame, columns=columns, show="headings", height=7)  # было 10 → стало 7
+            left_frame, columns=columns, show="headings", height=7, selectmode="extended")
         self.tree.heading("id", text="ID")
         self.tree.heading("name", text="Название")
         self.tree.heading("date", text="Дата")
@@ -94,6 +97,54 @@ class HistoryTab:
         right_frame.pack(side=tk.RIGHT, fill=tk.BOTH,
                          expand=True, padx=(5, 10), pady=10)
 
+        # === Верхняя панель: Пределы Y + Кнопки ===
+        top_control_frame = ttk.Frame(right_frame)
+        top_control_frame.pack(fill=tk.X, pady=(0, 8))
+
+        # Левая часть — пределы по Y
+        y_limit_frame = ttk.LabelFrame(
+            top_control_frame, text=" Пределы по Y ", padding=8)
+        y_limit_frame.pack(side=tk.LEFT, fill=tk.Y)
+
+        ttk.Label(y_limit_frame, text="Y min:").pack(side=tk.LEFT, padx=(5, 2))
+        self.y_min_var = tk.StringVar(value="-1.0")
+        self.entry_y_min = ttk.Entry(
+            y_limit_frame, textvariable=self.y_min_var, width=8)
+        self.entry_y_min.pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(y_limit_frame, text="Y max:").pack(side=tk.LEFT, padx=(5, 2))
+        self.y_max_var = tk.StringVar(value="2.0")
+        self.entry_y_max = ttk.Entry(
+            y_limit_frame, textvariable=self.y_max_var, width=8)
+        self.entry_y_max.pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Button(y_limit_frame, text="Применить",
+                   command=self.apply_y_limits).pack(side=tk.LEFT, padx=8)
+        ttk.Button(y_limit_frame, text="Авто",
+                   command=self.reset_y_limits).pack(side=tk.LEFT)
+
+        # 2. Блок с двумя кнопками (сразу справа от пределов Y)
+        buttons_frame = ttk.Frame(top_control_frame)
+        buttons_frame.pack(side=tk.LEFT, padx=(20, 0))
+
+        load_btn = ttk.Button(
+            buttons_frame,
+            text="📋 Загрузить параметры в редактор",
+            command=self.load_params_to_tabs
+        )
+        load_btn.pack(side=tk.LEFT, padx=(0, 10), ipadx=15, ipady=8)
+
+        save_btn = ttk.Button(
+            buttons_frame,
+            text="💾 Сохранить графики",
+            command=self.save_plots
+        )
+        save_btn.pack(side=tk.LEFT, ipadx=20, ipady=8)
+
+        # Автоприменение пределов при Enter
+        self.entry_y_min.bind("<Return>", lambda e: self.apply_y_limits())
+        self.entry_y_max.bind("<Return>", lambda e: self.apply_y_limits())
+
         # === Три графика в ряд ===
         plot_frame = ttk.Frame(right_frame)
         plot_frame.pack(fill=tk.X, pady=(0, 12))
@@ -138,6 +189,37 @@ class HistoryTab:
         sb.pack(side=tk.RIGHT, fill=tk.Y)
         self.table.configure(yscrollcommand=sb.set)
 
+    def apply_y_limits(self):
+        """Применить введённые пределы по Y"""
+        try:
+            ymin = float(self.y_min_var.get().strip())
+            ymax = float(self.y_max_var.get().strip())
+
+            if ymin >= ymax:
+                messagebox.showwarning(
+                    "Ошибка", "Y min должен быть меньше Y max")
+                return
+
+            for ax in self.axes:
+                ax.set_ylim(ymin, ymax)
+
+            self.canvas_plot.draw()
+
+        except ValueError:
+            messagebox.showwarning(
+                "Ошибка", "Введите корректные числовые значения")
+
+    def reset_y_limits(self):
+        """Сброс на автоматические пределы"""
+        for ax in self.axes:
+            ax.autoscale(axis='y')
+
+        # Можно задать разумные значения по умолчанию
+        # self.y_min_var.set("-1.0")
+        # self.y_max_var.set("2.0")
+
+        self.canvas_plot.draw()
+
     def on_show_button(self):
         """Вызывается по кнопке «Показать» или Enter"""
         # Проверяем, что введено число
@@ -153,6 +235,114 @@ class HistoryTab:
         # Если режим "every" или "single" — обновляем графики
         if self.display_mode.get() in ("every", "single"):
             self.show_selected_layers()
+
+    def load_params_to_tabs(self):
+        """Загружает параметры из выбранного расчёта обратно в редактор"""
+        if not self.current_calc:
+            messagebox.showwarning(
+                "Ошибка", "Сначала выберите расчёт из списка истории!")
+            return
+
+        c = self.current_calc
+        if not messagebox.askyesno("Подтверждение",
+                                   "Загрузить параметры этого расчёта в поля для нового расчета?\n\n"
+                                   "Текущие значения на вкладках будут перезаписаны."):
+            return
+
+        try:
+            # === 1. Начальные условия + сетка (ParameterApp) ===
+            i = c['initial']
+            g = c['grid']
+
+            # A0, A1, A2, A3
+            for key in ["a0", "a1", "a2", "a3"]:
+                for j in range(3):
+                    self.parameter_app.entries[f"a_{key[1]}"][j].delete(
+                        0, tk.END)
+                    self.parameter_app.entries[f"a_{key[1]}"][j].insert(
+                        0, str(i[key][j]))
+
+            # b1, b2, b3
+            for j in range(1, 4):
+                self.parameter_app.entries[f"b_{j}"].delete(0, tk.END)
+                self.parameter_app.entries[f"b_{j}"].insert(
+                    0, str(i['b'][j-1]))
+
+            # Параметры сетки
+            self.parameter_app.entries["n (сетка по x)"].delete(0, tk.END)
+            self.parameter_app.entries["m (сетка по t)"].delete(0, tk.END)
+            self.parameter_app.entries["T (время)"].delete(0, tk.END)
+
+            self.parameter_app.entries["n (сетка по x)"].insert(
+                0, str(g['n']))  # у тебя n = nodes, сохраняется nodes
+            self.parameter_app.entries["m (сетка по t)"].insert(0, str(g['m']))
+            self.parameter_app.entries["T (время)"].insert(0, str(g['T']))
+
+            # === 2. Параметры системы (NumericalSolutionApp) ===
+            s = c['system']
+            for param, value in s.items():
+                if param in self.numerical_app.entries:
+                    self.numerical_app.entries[param].delete(0, tk.END)
+                    self.numerical_app.entries[param].insert(0, str(value))
+
+            # Обновляем ограничения tau
+            self.parameter_app.update_time_constraint()
+
+            messagebox.showinfo("Успешно",
+                                "Параметры успешно загружены в редактор!\n"
+                                "Перейдите на первую и вторую вкладки.")
+
+        except Exception as e:
+            messagebox.showerror(
+                "Ошибка", f"Не удалось загрузить параметры:\n{e}")
+
+    def save_plots(self):
+        """Сохраняет текущие графики в файл"""
+        if not hasattr(self, 'fig') or self.fig is None:
+            messagebox.showwarning("Ошибка", "Нет графиков для сохранения")
+            return
+
+        from tkinter import filedialog
+        import os
+
+        # Предлагаемое имя файла
+        default_name = "calculation_plots.png"
+        if self.current_calc and self.current_calc.get("name"):
+            default_name = f"{self.current_calc['name']}_plots.png".replace(
+                " ", "_")
+
+        file_path = filedialog.asksaveasfilename(
+            title="Сохранить графики",
+            defaultextension=".png",
+            initialfile=default_name,
+            filetypes=[
+                ("PNG Image", "*.png"),
+                ("JPEG Image", "*.jpg *.jpeg"),
+                ("PDF Document", "*.pdf"),
+                ("All Files", "*.*")
+            ]
+        )
+
+        if not file_path:
+            return  # пользователь отменил
+
+        try:
+            # Сохраняем с хорошим качеством
+            self.fig.savefig(
+                file_path,
+                dpi=300,           # высокое качество
+                bbox_inches='tight',
+                facecolor='white'
+            )
+
+            messagebox.showinfo(
+                "Успешно",
+                f"Графики успешно сохранены:\n{os.path.basename(file_path)}"
+            )
+
+        except Exception as e:
+            messagebox.showerror("Ошибка сохранения",
+                                 f"Не удалось сохранить файл:\n{e}")
 
     def toggle_entry_state(self, *args):
         mode = self.display_mode.get()
@@ -432,22 +622,18 @@ class HistoryTab:
             label = f"t = {t}"
 
             if mode == "single":
-                self.axes[0].plot(x, a, color="blue", linewidth=lw, label=label)
-                self.axes[1].plot(x, s, color="green", linewidth=lw, label=label)
+                self.axes[0].plot(x, a, color="blue", linewidth=lw)
+                self.axes[1].plot(x, s, color="green", linewidth=lw)
                 self.axes[2].plot(x, y, color="red", linewidth=lw, label=label)
             else:
                 colors = ['red', 'blue', 'green', 'orange', 'purple', 'black']
                 color = colors[idx % len(colors)]
-                self.axes[0].plot(x, a, color=color, linewidth=lw, label=label)
-                self.axes[1].plot(x, s, color=color, linewidth=lw, label=label)
+                self.axes[0].plot(x, a, color=color, linewidth=lw)
+                self.axes[1].plot(x, s, color=color, linewidth=lw)
                 self.axes[2].plot(x, y, color=color, linewidth=lw, label=label)
 
         # Оформление графиков
         titles = ["a(x,t)", "s(x,t)", "y(x,t)"]
-        show_legend = True
-
-        if self.display_mode.get() == "every":
-            show_legend = False
 
         for i, ax in enumerate(self.axes):
             ax.set_title(titles[i], fontsize=13, pad=15)
@@ -456,8 +642,14 @@ class HistoryTab:
             ax.grid(True, alpha=0.35)
             ax.tick_params(labelsize=10)
             ax.set_ylim(-1.0, 2.0)
-            if show_legend:
-                ax.legend(fontsize=9.5, loc="upper right", framealpha=0.92, shadow=True)
+
+        if self.display_mode.get() != "every":
+            self.axes[2].legend(
+                fontsize=9.5,
+                loc="lower right",
+                framealpha=0.95,
+                shadow=True
+            )
 
         # Вместо tight_layout — фиксированные отступы (чтобы не было предупреждений)
         self.fig.subplots_adjust(left=0.06, right=0.98, top=0.88, bottom=0.14, wspace=0.28)
@@ -519,34 +711,54 @@ class HistoryTab:
                 ))
 
     def delete_selected(self):
+        """Удаление одного или нескольких выбранных расчётов"""
         sel = self.tree.selection()
         if not sel:
-            messagebox.showwarning("Выберите", "Выберите расчёт для удаления")
+            messagebox.showwarning("Ничего не выбрано", "Выберите хотя бы один расчёт для удаления")
             return
 
-        if not messagebox.askyesno("Подтверждение", "Удалить выбранный расчёт навсегда?"):
+        count = len(sel)
+
+        if count == 1:
+            confirm_text = "Удалить выбранный расчёт навсегда?"
+        else:
+            confirm_text = f"Удалить {count} выбранных расчётов навсегда?\n\nЭто действие нельзя отменить!"
+
+        if not messagebox.askyesno("Подтверждение удаления", confirm_text):
             return
 
-        calc_id = self.tree.item(sel[0])["values"][0]
+        success_count = 0
+        errors = []
 
-        try:
-            delete_calculation(calc_id)
-            self.refresh_list()
+        for item in sel:
+            try:
+                calc_id = self.tree.item(item)["values"][0]
+                delete_calculation(calc_id)
+                success_count += 1
+            except Exception as e:
+                errors.append(f"ID {calc_id}: {e}")
 
-            # Полная очистка правой панели и графиков
+        # Обновляем список
+        self.refresh_list()
+
+        # Очищаем правую панель, если удалён текущий расчёт
+        if self.current_calc and self.current_calc.get("id") in [int(self.tree.item(i)["values"][0]) for i in sel]:
+            self.current_calc = None
             for widget in self.params_frame.winfo_children():
                 widget.destroy()
-
             for ax in self.axes:
                 ax.cla()
             self.canvas_plot.draw()
-
             self.table.delete(*self.table.get_children())
 
-            # Сбрасываем текущий расчёт
-            self.current_calc = None
-
-            messagebox.showinfo("Готово", "Расчёт успешно удалён")
-
-        except Exception as e:
-            messagebox.showerror("Ошибка", f"Не удалось удалить расчёт:\n{e}")
+        # Сообщение пользователю
+        if success_count == count:
+            if count == 1:
+                messagebox.showinfo("Готово", "Расчёт успешно удалён")
+            else:
+                messagebox.showinfo("Готово", f"Успешно удалено {success_count} расчётов")
+        else:
+            messagebox.showwarning(
+                "Частичная ошибка",
+                f"Успешно удалено: {success_count} из {count}\n\nОшибки:\n" + "\n".join(errors)
+            )

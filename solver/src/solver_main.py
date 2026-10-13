@@ -203,13 +203,6 @@ class ParameterApp:
 
     def validate_parameters(self):
         try:
-            for key in ["a_0", "a_1", "a_2", "a_3"]:
-                for entry in self.entries[key]:
-                    value = float(entry.get())
-                    if value < 0:
-                        raise ValueError(
-                            f"Значение {key} должно быть неотрицательным")
-
             for i in range(1, 4):
                 b_value = int(self.entries[f"b_{i}"].get())
                 if b_value < 0:
@@ -1461,7 +1454,11 @@ class MainApp:
             self.tab1, self.numerical_app.update_system_parameters)
         self.numerical_app.parameter_app = self.parameter_app
 
-        self.history_tab = HistoryTab(self.notebook)
+        self.history_tab = HistoryTab(
+            self.notebook,
+            parameter_app=self.parameter_app,
+            numerical_app=self.numerical_app
+        )
 
     def save_results(self):
         if not self.numerical_app.base_data:
