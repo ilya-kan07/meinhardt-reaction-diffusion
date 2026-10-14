@@ -37,5 +37,5 @@ exe = EXE(
     debug=False,
     console=False,
     icon='resources/analysis/analysis.ico',
-    version='version.txt',
+    version='analysis_version.txt',
 )
