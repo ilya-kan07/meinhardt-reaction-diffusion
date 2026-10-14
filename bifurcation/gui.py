@@ -2,10 +2,12 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from compute import compute_bifurcation, find_equilibrium
-from analysis import find_intersections_general
-from initial_conditions import compute_initial_conditions
-from solver_core import MeinhardtSolver
+from bifurcation.compute import compute_bifurcation, find_equilibrium
+from bifurcation.analysis import find_intersections_general
+from bifurcation.initial_conditions import compute_initial_conditions
+from bifurcation.solver_core import MeinhardtSolver
+# Общая БД с solver: в exe лежит рядом с .exe, при запуске из терминала — в корне проекта
+from solver.src.database import init_db, get_conn, numpy_to_bytes
 import numpy as np
 import threading
 
@@ -849,15 +851,6 @@ class App:
         if not user_name:
             return
 
-        # === Надёжный импорт ===
-        import sys
-        from pathlib import Path
-        project_root = Path(__file__).resolve().parent.parent
-        if str(project_root) not in sys.path:
-            sys.path.insert(0, str(project_root))
-
-        from solver.src.database import init_db, get_conn, numpy_to_bytes
-
         try:
             init_db()
             conn = get_conn()
@@ -1147,7 +1140,7 @@ class App:
         self.analysis_ax.clear()
 
         if "Пересечения a1" in method_name:
-            from analysis import plot_a1_a2_intersections
+            from bifurcation.analysis import plot_a1_a2_intersections
             plot_a1_a2_intersections(
                 params, varied_param, start, end, n_points,
                 ax=self.analysis_ax,
@@ -1155,7 +1148,7 @@ class App:
                 log_func=self.log_analysis
             )
         elif "коэффициентов b" in method_name.lower() or "b1, b3" in method_name.lower():
-            from analysis import plot_b_coefficients_vs_parameter
+            from bifurcation.analysis import plot_b_coefficients_vs_parameter
             plot_b_coefficients_vs_parameter(
                 params,
                 varied_param=varied_param,
@@ -1331,9 +1324,19 @@ class App:
 
 
 # ========================= ЗАПУСК =========================
-if __name__ == "__main__":
+def main():
     root = tk.Tk()
     style = ttk.Style()
     style.theme_use("clam")
-    app = App(root)
+
+    def on_closing():
+        plt.close('all')
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_closing)
+    App(root)
     root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

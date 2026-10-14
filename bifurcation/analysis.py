@@ -231,8 +231,10 @@ def plot_a1_a2_intersections(params, varied_param, start, end, num_points=5, ax=
     if save_excel:
         if excel_filename is None:
             from datetime import datetime
+            from bifurcation.paths import get_results_dir
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            excel_filename = f"equilibrium_points_{varied_param}_{timestamp}.xlsx"
+            excel_filename = str(
+                get_results_dir() / f"equilibrium_points_{varied_param}_{timestamp}.xlsx")
 
         # Создаем Excel файл с несколькими листами
         with pd.ExcelWriter(excel_filename, engine='openpyxl') as writer:

@@ -384,40 +384,6 @@ def compute_bifurcation(params, param1, param2, step_size, num_steps):
 
     print(f"  Итого точек на кривой: {len(points)}")
 
-    # ────── СОХРАНЕНИЕ РЕЗУЛЬТАТОВ В CSV ──────
-    if len(points) > 0:
-        import pandas as pd
-        import os
-        from datetime import datetime
-
-        # Создаём папку, если её нет
-        os.makedirs('results', exist_ok=True)
-
-        # Создаём DataFrame с основными колонками
-        df = pd.DataFrame({
-            param1: data_p1,
-            param2: data_p2
-        })
-
-        # Добавляем дополнительные полезные данные (по желанию можно убрать)
-        extra_df = pd.DataFrame(points_data)
-        df_full = pd.concat([df.reset_index(drop=True),
-                             extra_df.reset_index(drop=True)[['a', 's', 'y', 'bk1', 'bk2', 'bk3', 'status']]],
-                            axis=1)
-
-        # Имя файла с временной меткой
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f'results/bifurcation_turing_{param1}_{param2}_{timestamp}.csv'
-
-        # Сохраняем
-        # df_full.to_csv(filename, index=False, float_format='%.10f')
-
-        print(f"\n✅ Результаты бифуркационной кривой сохранены в файл:")
-        print(f"   → {filename}")
-        print(f"   Количество точек: {len(df)}")
-    else:
-        print("\n⚠️  Нет данных для сохранения в CSV (кривая пустая).")
-
     return data_p1, data_p2, points_data
 
 import matplotlib.pyplot as plt
