@@ -20,6 +20,18 @@ def get_resource_path(filename: str) -> Path:
 
 
 def get_results_dir() -> Path:
-    path = get_base_path() / "results"
+    """
+    Папка для результатов расчётов (results/).
+
+    * В обычном режиме – results/ в корне проекта.
+    * В exe – results/ рядом с самим .exe (как и БД, см. database.py).
+      _MEIPASS здесь использовать нельзя: это временная папка,
+      она удаляется при закрытии программы вместе с результатами.
+    """
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        base = Path(sys.executable).parent
+    else:
+        base = get_base_path()
+    path = base / "results"
     path.mkdir(exist_ok=True, parents=True)
     return path
